@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  cartItems String[] // stores an array of items
+  addresses Address[]
+  orders    Order[]
+  @@map("users")
+}
+
+model Product {
+    id         Int         @id @default(autoincrement())
+    name       String
+    description String
+    price      Float
+    offerPrice Float
+    image      String[]    // Array of image URLs
+    inStock    Boolean
+    category   String
+    orderItems OrderItem[] // relation to OrderItem model
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
+    @@map("products")
+}
+
+model Address {
+    id        Int      @id @default(autoincrement())
+    userId    Int      @unique
+    user      User     @relation(fields: [userId], references: [id])
+    firstName String
+    lastName  String
+    street    String
+    city      String
+    state     String
+    zipCode   Int
+    country   String
+    phone     String
+    orders    Order[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Order {
+    id        Int         @id @default(autoincrement())
+    userId    Int
+    user      User        @relation(fields: [userId], references: [id])
+    items     OrderItem[] // relation to OrderItem model
+    amount    Float       // total order amount
+    addressId Int
+    address   Address     @relation(fields: [addressId], references: [id])
+    status    String      @default("Order Placed")
+    paymentType String
+    isPaid    Boolean
+    createdAt DateTime    @default(now())
+    updatedAt DateTime    @updatedAt
+    @@map("orders")
+}
+
+model OrderItem {
+    id        Int     @id @default(autoincrement())
+    orderId   Int
+    order     Order   @relation(fields: [orderId], references: [id])
+    productId Int
+    product   Product @relation(fields: [productId], references: [id])
+    quantity  Int
+    price     Float   // price at time of order (for historical accuracy)
+    @@map("orderItems")
+}
+
+
