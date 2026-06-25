@@ -1,171 +1,161 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axiosInstance from '../lib/axiosConfig';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { updateCartItems } from '../redux/userSlice';
+import toast from 'react-hot-toast';
 
 interface Product {
   id: number;
   name: string;
   price: number;
-  image: string;
+  offerPrice: number;
+  image: string[];
   category: string;
   description: string;
-  longDescription: string;
   inStock: boolean;
-  nutritionInfo: {
-    calories: number;
-    protein: string;
-    carbs: string;
-    fat: string;
-  };
 }
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.user.user);
+
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [adding, setAdding] = useState(false);
+  const [activeImage, setActiveImage] = useState(0);
 
-  // Mock data - replace with API call
-  const product: Product = {
-    id: 1,
-    name: 'Fresh Apples',
-    price: 3.99,
-    image: '🍎',
-    category: 'fruits',
-    description: 'Crispy red apples',
-    longDescription: 'These premium red apples are hand-picked from local orchards. Known for their crisp texture and sweet flavor, they are perfect for snacking, baking, or adding to salads. Rich in fiber, vitamin C, and antioxidants, these apples are not only delicious but also nutritious.',
-    inStock: true,
-    nutritionInfo: {
-      calories: 95,
-      protein: '0.5g',
-      carbs: '25g',
-      fat: '0.3g'
-    }
+  useEffect(() => {
+    axiosInstance.get(`/api/products/${id}`)
+      .then((res) => setProduct(res.data.product))
+      .catch(() => { toast.error('Product not found'); navigate('/products'); })
+      .finally(() => setLoading(false));
+  }, [id, navigate]);
+
+  const addToCart = async () => {
+    if (!user) { toast.error('Please login first'); navigate('/login'); return; }
+    if (!product) return;
+    setAdding(true);
+    try {
+      let cartItems = user.cartItems;
+      for (let i = 0; i < quantity; i++) {
+        const res = await axiosInstance.post('/api/cart/update', { productId: String(product.id) });
+        cartItems = res.data.cart.cartItems;
+      }
+      dispatch(updateCartItems(cartItems));
+      toast.success(`${quantity}× ${product.name} added to cart!`);
+    } catch { toast.error('Failed to add to cart'); }
+    finally { setAdding(false); }
   };
 
-  const addToCart = () => {
-    // TODO: Implement cart functionality
-    console.log('Added to cart:', { product, quantity });
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+  if (!product) return null;
 
-  const relatedProducts = [
-    { id: 2, name: 'Bananas', price: 2.49, image: '🍌' },
-    { id: 3, name: 'Oranges', price: 4.99, image: '🍊' },
-    { id: 4, name: 'Grapes', price: 5.99, image: '🍇' },
-  ];
+  const discount = product.price > product.offerPrice
+    ? Math.round(((product.price - product.offerPrice) / product.price) * 100)
+    : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-6">
-        {/* Breadcrumb */}
-        <nav className="mb-8">
-          <button 
-            onClick={() => navigate(-1)}
-            className="text-green-600 hover:text-green-700 mb-4"
-          >
-            ← Back to Products
-          </button>
-        </nav>
+    <div className="min-h-screen bg-[#0a0a0a] text-white py-10">
+      <div className="container mx-auto px-6 max-w-5xl">
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
-            {/* Product Image */}
-            <div className="text-center">
-              <div className="text-9xl mb-4">{product.image}</div>
-              <div className={`inline-block px-3 py-1 rounded-full text-sm ${
-                product.inStock 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                {product.inStock ? 'In Stock' : 'Out of Stock'}
+        <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white text-sm mb-8 inline-flex items-center gap-1 transition">
+          ← Back
+        </button>
+
+        <div className="bg-[#161616] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+
+            {/* Images */}
+            <div className="bg-[#111] p-8 flex flex-col items-center justify-center">
+              <div className="w-full h-72 flex items-center justify-center rounded-xl overflow-hidden mb-4">
+                {product.image?.[activeImage]
+                  ? <img src={product.image[activeImage]} alt={product.name} className="h-full w-full object-contain" />
+                  : <span className="text-8xl">📱</span>}
               </div>
+              {product.image?.length > 1 && (
+                <div className="flex gap-2 mt-2">
+                  {product.image.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveImage(i)}
+                      className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition ${activeImage === i ? 'border-amber-500' : 'border-[#2a2a2a] hover:border-amber-500/40'}`}
+                    >
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Product Info */}
-            <div>
-              <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
-              <p className="text-gray-600 mb-4 capitalize">Category: {product.category}</p>
-              <p className="text-gray-700 mb-6">{product.longDescription}</p>
-              
-              <div className="mb-6">
-                <span className="text-3xl font-bold text-green-600">${product.price}</span>
-                <span className="text-gray-500 ml-2">per item</span>
+            {/* Info */}
+            <div className="p-8">
+              <p className="text-amber-400 text-xs tracking-widest uppercase mb-2">{product.category}</p>
+              <h1 className="text-3xl font-extrabold mb-3">{product.name}</h1>
+              <p className="text-gray-400 text-sm leading-relaxed mb-6">{product.description}</p>
+
+              {/* Price */}
+              <div className="flex items-baseline gap-3 mb-2">
+                <span className="text-3xl font-bold text-amber-400">₹{product.offerPrice}</span>
+                {discount > 0 && (
+                  <>
+                    <span className="text-gray-500 line-through">₹{product.price}</span>
+                    <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full font-semibold">{discount}% OFF</span>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 mb-6">Inclusive of all taxes</p>
+
+              {/* Stock status */}
+              <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mb-6 ${product.inStock ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${product.inStock ? 'bg-green-400' : 'bg-red-400'}`} />
+                {product.inStock ? 'In Stock' : 'Out of Stock'}
               </div>
 
-              {/* Quantity Selector */}
+              {/* Quantity */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 w-10 h-10 rounded-full flex items-center justify-center"
-                  >
-                    -
-                  </button>
-                  <span className="text-xl font-semibold w-12 text-center">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 w-10 h-10 rounded-full flex items-center justify-center"
-                  >
-                    +
-                  </button>
+                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Quantity</p>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-9 h-9 rounded-full bg-[#0f0f0f] border border-[#2a2a2a] text-white hover:border-amber-500/50 transition text-lg font-bold flex items-center justify-center">−</button>
+                  <span className="w-10 text-center font-bold text-lg">{quantity}</span>
+                  <button onClick={() => setQuantity(quantity + 1)} className="w-9 h-9 rounded-full bg-[#0f0f0f] border border-[#2a2a2a] text-white hover:border-amber-500/50 transition text-lg font-bold flex items-center justify-center">+</button>
                 </div>
               </div>
 
-              {/* Add to Cart Button */}
+              {/* Add to cart */}
               <button
                 onClick={addToCart}
-                disabled={!product.inStock}
-                className={`w-full py-3 px-6 rounded-md text-lg font-semibold transition duration-300 ${
-                  product.inStock
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                disabled={!product.inStock || adding}
+                className={`w-full py-3.5 rounded-xl text-base font-bold transition-all duration-200 active:scale-95 ${
+                  product.inStock ? 'bg-amber-500 text-black hover:bg-amber-400' : 'bg-[#222] text-gray-600 cursor-not-allowed'
                 }`}
               >
-                {product.inStock ? `Add ${quantity} to Cart - $${(product.price * quantity).toFixed(2)}` : 'Out of Stock'}
+                {adding ? 'Adding...' : product.inStock ? `Add ${quantity} to Cart — ₹${(product.offerPrice * quantity).toFixed(2)}` : 'Out of Stock'}
               </button>
-            </div>
-          </div>
 
-          {/* Nutrition Information */}
-          <div className="border-t border-gray-200 p-8">
-            <h3 className="text-xl font-semibold mb-4">Nutrition Information</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{product.nutritionInfo.calories}</div>
-                <div className="text-sm text-gray-600">Calories</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{product.nutritionInfo.protein}</div>
-                <div className="text-sm text-gray-600">Protein</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{product.nutritionInfo.carbs}</div>
-                <div className="text-sm text-gray-600">Carbs</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{product.nutritionInfo.fat}</div>
-                <div className="text-sm text-gray-600">Fat</div>
+              {/* Badges */}
+              <div className="mt-6 grid grid-cols-3 gap-3">
+                {[
+                  { icon: '🚀', text: 'Fast Dispatch' },
+                  { icon: '🔒', text: 'Secure Pay' },
+                  { icon: '↩️', text: '7-Day Return' },
+                ].map((b) => (
+                  <div key={b.text} className="bg-[#111] border border-[#2a2a2a] rounded-lg p-3 text-center">
+                    <div className="text-xl mb-1">{b.icon}</div>
+                    <p className="text-[10px] text-gray-400">{b.text}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Related Products */}
-        <div className="mt-12">
-          <h3 className="text-2xl font-bold mb-6">Related Products</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {relatedProducts.map(relatedProduct => (
-              <div key={relatedProduct.id} className="bg-white rounded-lg shadow-md p-6 text-center hover:shadow-lg transition duration-300">
-                <div className="text-4xl mb-3">{relatedProduct.image}</div>
-                <h4 className="font-semibold mb-2">{relatedProduct.name}</h4>
-                <p className="text-green-600 font-bold">${relatedProduct.price}</p>
-                <button
-                  onClick={() => navigate(`/product/${relatedProduct.id}`)}
-                  className="mt-3 w-full bg-green-600 text-white py-2 rounded-md hover:bg-green-700 transition duration-300"
-                >
-                  View Details
-                </button>
-              </div>
-            ))}
           </div>
         </div>
       </div>

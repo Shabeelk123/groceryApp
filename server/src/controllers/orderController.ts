@@ -3,32 +3,42 @@ import { Request, Response } from "express";
 
 export const placeOrderCOD = async (req: Request, res: Response) => {
     try {
-        const { userId, items, addressId } = req.body;
+        const userId = req.userId;
+        const { items, addressId } = req.body;
         if (!userId || !items || !addressId) {
             return res.status(400).json({ error: "Missing required fields" });
         }
-        //calculate total amount
-        let totalAmount = await items.reduce(async (total: number, item: any) => {
+
+        // Calculate total amount using for...of to correctly await each lookup
+        let totalAmount = 0;
+        for (const item of items) {
             const product = await prisma.product.findUnique({ where: { id: item.productId } });
             if (!product) {
-                throw new Error(`Product with id ${item.productId} not found`);
+                return res.status(404).json({ error: `Product with id ${item.productId} not found` });
             }
-            return total + product.offerPrice * item.quantity;
-        }, 0);
+            totalAmount += product.offerPrice * item.quantity;
+        }
 
-        // add tax
+        // Add 2% tax
         totalAmount += Math.round(totalAmount * 0.02);
+
         const order = await prisma.order.create({
             data: {
                 userId,
                 addressId,
-                items,
+                items: {
+                    create: items.map((item: any) => ({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        price: item.price,
+                    })),
+                },
                 amount: totalAmount,
                 paymentType: "COD",
                 isPaid: false,
             },
         });
-        return res.status(201).json({ order });
+        return res.status(201).json({ success: true, order });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to place order" });
@@ -38,7 +48,7 @@ export const placeOrderCOD = async (req: Request, res: Response) => {
 // order details of individual user
 export const orderDetails = async (req: Request, res: Response) => {
     try {
-        const { userId } = req.body;
+        const userId = req.userId;
         // verify isPaid is true and cod also
         const orders = await prisma.order.findMany({
             where: {

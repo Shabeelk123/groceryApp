@@ -3,9 +3,10 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 
 interface User {
+  id: number;
   name: string;
   email: string;
-  // add more fields if needed (like token, id, etc.)
+  cartItems: string[];
 }
 
 interface UserState {
@@ -31,9 +32,14 @@ export const userSlice = createSlice({
     setShowUserLogin(state, action: PayloadAction<boolean>) {
       state.showUserLogin = action.payload;
     },
+    updateCartItems(state, action: PayloadAction<string[]>) {
+      if (state.user) {
+        state.user.cartItems = action.payload;
+      }
+    },
   },
 });
 
-export const { setUser, clearUser, setShowUserLogin } = userSlice.actions;
+export const { setUser, clearUser, setShowUserLogin, updateCartItems } = userSlice.actions;
 
 export default userSlice.reducer;

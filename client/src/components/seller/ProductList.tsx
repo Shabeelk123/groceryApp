@@ -1,38 +1,84 @@
-import { useSelector } from "react-redux";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../store";
+import { setProducts } from "../../redux/sellerSlice";
+import axiosInstance from "../../lib/axiosConfig";
+import toast from "react-hot-toast";
 
 const ProductList = () => {
+    const dispatch = useDispatch();
     const { products } = useSelector((state: RootState) => state.seller);
-  return (
-    <div className="flex-1 py-10 flex flex-col justify-between">
-            <div className="w-full md:p-10 p-4">
-                <h2 className="pb-4 text-lg font-medium">All Products</h2>
-                <div className="flex flex-col items-center max-w-4xl w-full overflow-hidden rounded-md bg-white border border-gray-500/20">
-                    <table className="md:table-auto table-fixed w-full overflow-hidden">
-                        <thead className="text-gray-900 text-sm text-left">
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const response = await axiosInstance.get("/api/products/list");
+                dispatch(setProducts(response.data.products || []));
+            } catch {
+                toast.error("Failed to load products");
+            }
+        };
+        fetchProducts();
+    }, [dispatch]);
+
+    const toggleStock = async (id: number, currentStock: boolean) => {
+        try {
+            const response = await axiosInstance.put(`/api/products/${id}`, { inStock: !currentStock });
+            // Refresh product list
+            const updated = products.map((p: any) =>
+                p.id === id ? { ...p, inStock: response.data.product.inStock } : p
+            );
+            dispatch(setProducts(updated));
+        } catch {
+            toast.error("Failed to update stock");
+        }
+    };
+
+    return (
+        <div className="flex-1 py-10 px-4 md:px-10">
+            <h2 className="text-xl font-semibold mb-6">All Products ({products.length})</h2>
+
+            {products.length === 0 ? (
+                <div className="text-center py-16 text-gray-400">
+                    <div className="text-5xl mb-3">📦</div>
+                    <p>No products yet. Add your first product!</p>
+                </div>
+            ) : (
+                <div className="rounded-md border border-gray-200 overflow-hidden max-w-4xl">
+                    <table className="w-full table-auto">
+                        <thead className="bg-gray-50 text-gray-700 text-sm text-left">
                             <tr>
-                                <th className="px-4 py-3 font-semibold truncate">Product</th>
-                                <th className="px-4 py-3 font-semibold truncate">Category</th>
-                                <th className="px-4 py-3 font-semibold truncate hidden md:block">Selling Price</th>
-                                <th className="px-4 py-3 font-semibold truncate">In Stock</th>
+                                <th className="px-4 py-3 font-semibold">Product</th>
+                                <th className="px-4 py-3 font-semibold">Category</th>
+                                <th className="px-4 py-3 font-semibold hidden md:table-cell">MRP</th>
+                                <th className="px-4 py-3 font-semibold hidden md:table-cell">Offer Price</th>
+                                <th className="px-4 py-3 font-semibold">In Stock</th>
                             </tr>
                         </thead>
-                        <tbody className="text-sm text-gray-500">
-                            {products.map((product, index) => (
-                                <tr key={index} className="border-t border-gray-500/20">
-                                    <td className="md:px-4 pl-2 md:pl-4 py-3 flex items-center space-x-3 truncate">
-                                        <div className="border border-gray-300 rounded overflow-hidden">
-                                            <img src={product.image} alt="Product" className="w-16" />
-                                        </div>
-                                        <span className="truncate max-sm:hidden w-full">{product.name}</span>
+                        <tbody className="text-sm text-gray-600 divide-y divide-gray-100">
+                            {products.map((product: any) => (
+                                <tr key={product.id} className="hover:bg-gray-50 transition">
+                                    <td className="px-4 py-3 flex items-center gap-3">
+                                        {product.image?.[0] ? (
+                                            <img src={product.image[0]} alt={product.name} className="w-12 h-12 object-cover rounded border border-gray-200" />
+                                        ) : (
+                                            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-xl">🛒</div>
+                                        )}
+                                        <span className="font-medium text-gray-700 truncate max-w-[120px]">{product.name}</span>
                                     </td>
                                     <td className="px-4 py-3">{product.category}</td>
-                                    <td className="px-4 py-3 max-sm:hidden">${product.offerPrice}</td>
+                                    <td className="px-4 py-3 hidden md:table-cell text-gray-400 line-through">₹{product.price}</td>
+                                    <td className="px-4 py-3 hidden md:table-cell font-medium text-green-700">₹{product.offerPrice}</td>
                                     <td className="px-4 py-3">
-                                        <label className="relative inline-flex items-center cursor-pointer text-gray-900 gap-3">
-                                            <input type="checkbox" className="sr-only peer" defaultChecked={product.inStock} />
-                                            <div className="w-12 h-7 bg-slate-300 rounded-full peer peer-checked:bg-blue-600 transition-colors duration-200"></div>
-                                            <span className="dot absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-5"></span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only peer"
+                                                checked={product.inStock}
+                                                onChange={() => toggleStock(product.id, product.inStock)}
+                                            />
+                                            <div className="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-500 transition-colors duration-200" />
+                                            <span className="dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-5" />
                                         </label>
                                     </td>
                                 </tr>
@@ -40,9 +86,9 @@ const ProductList = () => {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            )}
         </div>
-  )
-}
+    );
+};
 
 export default ProductList;

@@ -39,9 +39,9 @@ export const sellerAuth = (req: Request, res: Response) => {
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as JwtPayload;
         if (decoded.email === process.env.SELLER_EMAIL) {
-            return res.status(200).json({ message: "Seller authenticated successfully" });
+            return res.status(200).json({success: true, message: "Seller authenticated successfully" });
         } else {
-            return res.status(401).json({ error: "Unauthorized - Invalid token payload" });
+            return res.status(401).json({success: false, error: "Unauthorized - Invalid token payload" });
         }
     } catch (error) {
         console.error("JWT verification error:", error);

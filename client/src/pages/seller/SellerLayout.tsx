@@ -1,62 +1,68 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { setShowSellerLogin } from "../../redux/sellerSlice";
+import axiosInstance from "../../lib/axiosConfig";
+import toast from "react-hot-toast";
 
 const SellerLayout = () => {
+  const dispatch = useDispatch();
 
-    const addproducticon: React.ReactNode = (
-        <svg className="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-            <path stroke="currentColor" strokeLinejoin="round" strokeWidth="2" d="M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5Zm16 14a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2ZM4 13a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6Zm16-2a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6Z" />
-        </svg>
-    );
+  const handleLogout = async () => {
+    try { await axiosInstance.post("/api/sellers/logout"); } catch {}
+    dispatch(setShowSellerLogin(true));
+    toast.success("Logged out");
+  };
 
-    const productlisticon: React.ReactNode = (
-        <svg className="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-            <path stroke="currentColor" strokeLinejoin="round" strokeWidth="2" d="M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5Zm16 14a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2ZM4 13a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6Zm16-2a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6Z" />
-        </svg>
-    );
+  const links = [
+    { name: "Add Product",   path: "/seller",             icon: "+" },
+    { name: "Product List",  path: "/seller/productlist", icon: "☰" },
+    { name: "Orders",        path: "/seller/orders",      icon: "📦" },
+  ];
 
-    const ordersicon: React.ReactNode = (
-        <svg className="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
-            <path stroke="currentColor" strokeLinejoin="round" strokeWidth="2" d="M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5Zm16 14a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2ZM4 13a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-6Zm16-2a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6Z" />
-        </svg>
-    );
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-6 h-14 flex items-center justify-between">
+        <span className="font-extrabold text-lg">
+          <span className="text-amber-500">Case</span>Hub
+          <span className="text-xs text-gray-400 font-normal ml-2">Admin</span>
+        </span>
+        <button
+          onClick={handleLogout}
+          className="text-sm border border-gray-200 rounded-full px-4 py-1 text-gray-600 hover:border-amber-400 hover:text-amber-600 transition"
+        >
+          Logout
+        </button>
+      </header>
 
-    const sidebarLinks = [
-        { name: "Add Product", path: "/seller", icon: addproducticon },
-        { name: "ProductList", path: "/seller/productlist", icon: productlisticon },
-        { name: "Orders", path: "/seller/orders", icon: ordersicon },
-    ];
+      <div className="flex h-[calc(100vh-56px)]">
+        {/* Sidebar */}
+        <aside className="w-16 md:w-52 bg-white border-r border-gray-100 flex flex-col pt-4">
+          {links.map((item) => (
+            <NavLink
+              key={item.name} to={item.path}
+              end={item.path === "/seller"}
+              className={({ isActive }) =>
+                `flex items-center gap-3 py-3 px-4 text-sm transition-colors ${
+                  isActive
+                    ? "border-r-4 border-amber-500 bg-amber-50 text-amber-700 font-semibold"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                }`
+              }
+            >
+              <span className="text-lg leading-none">{item.icon}</span>
+              <span className="hidden md:block">{item.name}</span>
+            </NavLink>
+          ))}
+        </aside>
 
-    return (
-        <>
-            <div className="flex items-center justify-between px-4 md:px-8 border-b border-gray-300 py-3 bg-white transition-all duration-300">
-                <a href="https://prebuiltui.com">
-                    <img className="h-9" src="https://raw.githubusercontent.com/prebuiltui/prebuiltui/main/assets/dummyLogo/dummyLogoColored.svg" alt="dummyLogoColored" />
-                </a>
-                <div className="flex items-center gap-5 text-gray-500">
-                    <p>Hi! Admin</p>
-                    <button className='border rounded-full text-sm px-4 py-1' onClick={() => {setShowSellerLogin(false)}}>Logout</button>
-                </div>
-            </div>
-            <div className="flex w-full">
-            <div className="md:w-64 w-16 border-r h-[95vh] text-base border-gray-300 pt-4 flex flex-col ">
-                {sidebarLinks.map((item) => (
-                    <NavLink to={item.path} key={item.name} end={item.path === "/seller"}
-                        className={({isActive })=>`flex items-center py-3 px-4 gap-3 
-                            ${isActive ? "border-r-4 md:border-r-[6px] bg-primary/10 border-primary text-primary"
-                                : "hover:bg-gray-100/90 border-white"
-                            }`
-                        }
-                    >
-                        {item.icon}
-                        <p className="md:block hidden text-center">{item.name}</p>
-                    </NavLink>
-                ))}
-            </div>
-            <Outlet />
-            </div>
-        </>
-    );
+        {/* Content area */}
+        <main className="flex-1 overflow-y-auto bg-gray-50 text-gray-800">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
 };
 
 export default SellerLayout;

@@ -1,147 +1,170 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axiosInstance from '../lib/axiosConfig';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { updateCartItems } from '../redux/userSlice';
+import toast from 'react-hot-toast';
 
 interface Product {
   id: number;
   name: string;
   price: number;
-  image: string;
+  offerPrice: number;
+  image: string[];
   category: string;
   description: string;
   inStock: boolean;
 }
 
+const CATEGORIES = [
+  'all',
+  'iPhone Cases',
+  'Samsung Cases',
+  'Screen Protectors',
+  'Watch Straps',
+  'Wallets & Cards',
+  'Chargers & Cables',
+  'AirPod Cases',
+];
+
 const Products = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+  const [addingToCart, setAddingToCart] = useState<number | null>(null);
 
-  // Mock data - replace with API call
-  const products: Product[] = [
-    { id: 1, name: 'Fresh Apples', price: 3.99, image: '🍎', category: 'fruits', description: 'Crispy red apples', inStock: true },
-    { id: 2, name: 'Bananas', price: 2.49, image: '🍌', category: 'fruits', description: 'Ripe yellow bananas', inStock: true },
-    { id: 3, name: 'Carrots', price: 1.99, image: '🥕', category: 'vegetables', description: 'Fresh organic carrots', inStock: true },
-    { id: 4, name: 'Broccoli', price: 2.99, image: '🥦', category: 'vegetables', description: 'Green broccoli heads', inStock: false },
-    { id: 5, name: 'Milk', price: 4.49, image: '🥛', category: 'dairy', description: 'Fresh whole milk', inStock: true },
-    { id: 6, name: 'Cheese', price: 6.99, image: '🧀', category: 'dairy', description: 'Aged cheddar cheese', inStock: true },
-    { id: 7, name: 'Bread', price: 2.99, image: '🍞', category: 'bakery', description: 'Whole wheat bread', inStock: true },
-    { id: 8, name: 'Croissants', price: 5.99, image: '🥐', category: 'bakery', description: 'Buttery croissants', inStock: true },
-  ];
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.user.user);
 
-  const categories = ['all', 'fruits', 'vegetables', 'dairy', 'bakery'];
+  useEffect(() => {
+    axiosInstance.get('/api/products/list')
+      .then((res) => setProducts(res.data.products || []))
+      .catch(() => toast.error('Failed to load products'))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const filteredProducts = products
-    .filter(product => 
-      (selectedCategory === 'all' || product.category === selectedCategory) &&
-      product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortBy === 'price') return a.price - b.price;
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      return 0;
-    });
-
-  const addToCart = (product: Product) => {
-    // TODO: Implement cart functionality
-    console.log('Added to cart:', product);
+  const addToCart = async (product: Product) => {
+    if (!user) { toast.error('Please login to add items to cart'); return; }
+    setAddingToCart(product.id);
+    try {
+      const response = await axiosInstance.post('/api/cart/update', { productId: String(product.id) });
+      dispatch(updateCartItems(response.data.cart.cartItems));
+      toast.success(`${product.name} added!`);
+    } catch { toast.error('Failed to add to cart'); }
+    finally { setAddingToCart(null); }
   };
 
+  const filteredProducts = products
+    .filter((p) =>
+      (selectedCategory === 'all' || p.category === selectedCategory) &&
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (sortBy === 'price-asc') return a.offerPrice - b.offerPrice;
+      if (sortBy === 'price-desc') return b.offerPrice - a.offerPrice;
+      return a.name.localeCompare(b.name);
+    });
+
+  // Always use the hardcoded CaseHub category list for the filter
+  const categoryList = CATEGORIES;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="text-gray-400 text-lg">Loading products...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-[#0a0a0a] text-white py-10">
       <div className="container mx-auto px-6">
-        <h1 className="text-3xl font-bold mb-8">All Products</h1>
+
+        {/* Header */}
+        <div className="mb-10">
+          <p className="text-amber-400 text-xs tracking-widest uppercase mb-1">CaseHub</p>
+          <h1 className="text-4xl font-extrabold">All Products</h1>
+          <p className="text-gray-500 mt-1">{filteredProducts.length} products found</p>
+        </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Search Products</label>
-              <input
-                type="text"
-                placeholder="Search for products..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                {categories.map(category => (
-                  <option key={category} value={category}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Sort */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="name">Name</option>
-                <option value="price">Price</option>
-              </select>
-            </div>
+        <div className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-5 mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5 uppercase tracking-wide">Search</label>
+            <input
+              type="text" placeholder="Search products..."
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-[#0f0f0f] border border-[#2a2a2a] text-white placeholder-gray-600 px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-amber-500/60"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5 uppercase tracking-wide">Category</label>
+            <select
+              value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full bg-[#0f0f0f] border border-[#2a2a2a] text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-amber-500/60"
+            >
+              {categoryList.map((c) => (
+                <option key={c} value={c}>{c === 'all' ? 'All Categories' : c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-400 mb-1.5 uppercase tracking-wide">Sort By</label>
+            <select
+              value={sortBy} onChange={(e) => setSortBy(e.target.value)}
+              className="w-full bg-[#0f0f0f] border border-[#2a2a2a] text-white px-3 py-2 rounded-lg text-sm focus:outline-none focus:border-amber-500/60"
+            >
+              <option value="name">Name (A–Z)</option>
+              <option value="price-asc">Price (Low to High)</option>
+              <option value="price-desc">Price (High to Low)</option>
+            </select>
           </div>
         </div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {filteredProducts.map(product => (
-            <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition duration-300">
-              <div className="p-6 text-center">
-                <div className="text-6xl mb-4">{product.image}</div>
-                <h3 className="text-lg font-semibold mb-2">{product.name}</h3>
-                <p className="text-gray-600 text-sm mb-3">{product.description}</p>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-2xl font-bold text-green-600">${product.price}</span>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    product.inStock 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {product.inStock ? 'In Stock' : 'Out of Stock'}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <Link
-                    to={`/product/${product.id}`}
-                    className="block w-full bg-gray-100 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-200 transition duration-300"
-                  >
-                    View Details
+        {/* Grid */}
+        {filteredProducts.length === 0 ? (
+          <div className="text-center py-20 text-gray-500">No products found.</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {filteredProducts.map((product) => {
+              const discount = product.price > product.offerPrice
+                ? Math.round(((product.price - product.offerPrice) / product.price) * 100)
+                : 0;
+              return (
+                <div key={product.id} className="group bg-[#161616] border border-[#2a2a2a] rounded-xl overflow-hidden hover:border-amber-500/40 transition-all duration-300">
+                  <Link to={`/product/${product.id}`}>
+                    <div className="h-52 bg-[#111] overflow-hidden flex items-center justify-center">
+                      {product.image?.[0]
+                        ? <img src={product.image[0]} alt={product.name} className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-500" />
+                        : <span className="text-5xl">📱</span>}
+                    </div>
                   </Link>
-                  <button
-                    onClick={() => addToCart(product)}
-                    disabled={!product.inStock}
-                    className={`w-full py-2 px-4 rounded-md transition duration-300 ${
-                      product.inStock
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-                  </button>
+                  <div className="p-4">
+                    {discount > 0 && (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-semibold">{discount}% OFF</span>
+                    )}
+                    <h3 className="font-semibold mt-2 truncate text-sm">{product.name}</h3>
+                    <p className="text-gray-500 text-xs mt-0.5 mb-3">{product.category}</p>
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-amber-400 font-bold text-lg">₹{product.offerPrice}</span>
+                      {discount > 0 && <span className="text-gray-600 line-through text-xs">₹{product.price}</span>}
+                    </div>
+                    <button
+                      onClick={() => addToCart(product)}
+                      disabled={!product.inStock || addingToCart === product.id}
+                      className={`w-full py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${product.inStock
+                          ? 'bg-amber-500 text-black hover:bg-amber-400 active:scale-95'
+                          : 'bg-[#222] text-gray-600 cursor-not-allowed'
+                        }`}
+                    >
+                      {addingToCart === product.id ? 'Adding...' : product.inStock ? 'Add to Cart' : 'Out of Stock'}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {filteredProducts.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
+              );
+            })}
           </div>
         )}
       </div>

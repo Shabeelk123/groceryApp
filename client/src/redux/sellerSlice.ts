@@ -34,7 +34,7 @@ interface SellerState {
 
 const initialState: SellerState = {
     seller: null,
-    showSellerLogin: false,
+    showSellerLogin: true,
     products: [],
     orders: [],
 };

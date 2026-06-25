@@ -33,6 +33,7 @@ model Product {
     image      String[]    // Array of image URLs
     inStock    Boolean
     category   String
+    model      String?     // Device model compatibility (e.g. "iPhone 17 Pro Max")
     orderItems OrderItem[] // relation to OrderItem model
     createdAt  DateTime    @default(now())
     updatedAt  DateTime    @updatedAt
@@ -41,7 +42,7 @@ model Product {
 
 model Address {
     id        Int      @id @default(autoincrement())
-    userId    Int      @unique
+    userId    Int
     user      User     @relation(fields: [userId], references: [id])
     firstName String
     lastName  String

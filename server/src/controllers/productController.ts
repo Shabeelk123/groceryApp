@@ -14,11 +14,20 @@ interface Product {
 
 export const addProduct = async (req: Request, res: Response) => {
     try {
-        let productData = JSON.parse(req.body?.productData);
-        if (!productData.name || !productData.description || !productData.price || !productData.offerPrice || !productData.image || !productData.inStock || !productData.category) {
+        let productData: Product;
+        try {
+            productData = JSON.parse(req.body?.productData);
+        } catch {
+            return res.status(400).json({ error: "Invalid productData JSON" });
+        }
+
+        const { name, description, price, offerPrice, category } = productData;
+
+        // inStock is NOT checked with ! because false is a valid value
+        if (!name || !description || !price || !offerPrice || !category || productData.inStock === undefined) {
             return res.status(400).json({ error: "Missing required fields" });
         }
-       
+
         const images = req.files as Express.Multer.File[];
         if (!images || images.length === 0) {
             return res.status(400).json({ error: "Missing images" });
@@ -30,7 +39,7 @@ export const addProduct = async (req: Request, res: Response) => {
             return result.secure_url;
         }));
 
-        const product = await prisma.product.create({...productData, image: imageUrls});
+        const product = await prisma.product.create({ data: { ...productData, image: imageUrls } });
         return res.status(201).json({ product });
     } catch (error) {
         console.error(error);
