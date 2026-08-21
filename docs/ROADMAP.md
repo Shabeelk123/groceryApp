@@ -40,7 +40,7 @@ phone accessories, but money, tax, and shipping logic still assume India.
 - [x] Updated shipping/delivery copy across `Home.tsx` and `ProductDetail.tsx` to Dubai/UAE-specific SLAs instead of the generic placeholder text
 - [x] *(found while fixing the above)* `placeOrderCOD` now verifies the address belongs to the requesting user before using it — it previously trusted any `addressId` from the request body; and it now actually includes the delivery fee in the stored order total, which it silently ignored before
 
-**⚠️ Action needed — not something to auto-fix:** the ~15 products already seeded in the DB have prices like `3700`, `6900`, `2200` — clearly priced in ₹, and now displayed as literal AED (e.g. "AED 6,900" for a phone case, which is roughly $1,880). Re-price the existing catalog through the seller admin panel (or a one-off script) before this goes anywhere near real customers. This wasn't touched automatically since it's a real business pricing decision, not a currency-formatting bug.
+**⚠️ Action needed — not something to auto-fix:** the 12 products already seeded in the DB have prices like `3700`, `6900`, `2200` — clearly priced in ₹, and now displayed as literal AED (e.g. "AED 6,900" for a phone case, which is roughly $1,880). Re-price the existing catalog through the seller admin panel (or a one-off script) before this goes anywhere near real customers. This wasn't touched automatically since it's a real business pricing decision, not a currency-formatting bug.
 
 ---
 
@@ -65,17 +65,20 @@ expected by UAE shoppers, not optional nice-to-haves.
 The admin panel can currently only add products and toggle stock — that's not
 enough to run a real store without touching the database by hand.
 
-- [ ] Add product **edit** (full update: name, description, price, offerPrice, images, category, model) and **delete** endpoints + UI
-- [ ] Add multiple saved addresses: list/select/edit/delete endpoints (the `Address` model already supports multiple rows — only the UI/API for choosing among them is missing)
-- [ ] Add order status management for admin (e.g. Placed → Packed → Shipped → Delivered), not just a static default string
-- [ ] Add basic admin dashboard stats (orders today, revenue, low-stock count) — even a simple version beats none
-- [ ] Add inventory **quantity** tracking, not just a boolean `inStock` (so "3 left" style urgency and auto out-of-stock work)
-- [ ] Server-side pagination + search/filter/sort on `GET /api/products/list` — required once the catalog grows past a page or two
+- [x] Add product **edit** (full update: name, description, price, offerPrice, images, category, model) and **delete** endpoints + UI — `PATCH /api/products/:id` and `DELETE /api/products/:id`, with the delete blocked (clean 400, not a raw DB error) if the product has existing orders (`OrderItem` has a `RESTRICT` FK). `AddProduct.tsx` now doubles as the edit form via `/seller/edit/:id`.
+- [x] Add multiple saved addresses: list/select/edit/delete endpoints — `addressController.ts` now has `listAddresses`/`updateAddress`/`deleteAddress`, all ownership-checked (a user can't touch another user's address; verified with a cross-user test during implementation). Checkout now shows a radio list of saved addresses with inline Edit/Delete, falling back to the add-address form when the list is empty.
+- [x] Add order status management for admin — `PATCH /api/order/:id/status` (fixed set: Order Placed → Packed → Shipped → Delivered, plus Cancelled), a status dropdown in seller `Orders.tsx`, and the customer-facing timeline in `UserOrders.tsx` relabeled to match (was using a "Processing" label that didn't correspond to any real status value).
+- [x] Add basic admin dashboard stats — new `Dashboard.tsx`, now the `/seller` index route (Add Product moved to `/seller/add`): orders today, revenue today, total revenue, pending orders, total products, out-of-stock count.
+- [x] Server-side pagination + search/sort on `GET /api/products/list` — added as optional `?page=&limit=&search=&category=&sort=` params, backward compatible (no params still returns everything, so the public storefront is unaffected). Wired up in the seller `ProductList.tsx` search box; the public `Products.tsx` filter UI is intentionally left client-side for now (see note below).
+- [ ] Add inventory **quantity** tracking, not just a boolean `inStock` (so "3 left" style urgency and auto out-of-stock work) — **deferred**, not done in this pass. Bigger than the rest of this phase: needs a schema change, a stock-decrement step in order placement (ideally inside the Phase 2 transaction work), and touches every place `inStock` is currently read. Do it alongside Phase 2's stock-recheck-at-order-time item rather than as a standalone change.
+
+**Scoping note on the public catalog:** `Products.tsx`'s search/filter/sort still runs entirely client-side over the full product list. That's fine at the current catalog size (~12 products) and intentionally wasn't converted to use the new paginated endpoint — doing so is a real UX/design change (infinite scroll vs. pages vs. "load more", loading states per filter change) that deserves its own pass rather than being bundled into an admin-panel phase. Revisit once the catalog is large enough that shipping the whole list to the browser is actually a problem.
 
 ---
 
 ## Phase 4 — Security & hardening
 
+- [x] *(found and fixed during Phase 3 testing)* `registerUser`/`loginUser` were echoing the bcrypt password hash back in the response body — now stripped before the response is sent
 - [ ] Add request validation with `zod` (already TypeScript-native, pairs well with Prisma) on every controller that takes user input — replaces the current scattered manual `if (!field)` checks
 - [ ] Add `express-rate-limit` on `/api/users/login`, `/api/users/register`, `/api/sellers/login` at minimum
 - [ ] Add `helmet` to `server.ts`

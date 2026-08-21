@@ -26,7 +26,8 @@ interface Address {
   lastName: string;
   street: string;
   city: string;
-  state: string;
+  emirate: string;
+  poBox: string | null;
   country: string;
 }
 
@@ -83,8 +84,8 @@ const UserOrders = () => {
     const s = status.toLowerCase();
     if (s === 'delivered') return 4;
     if (s === 'shipped') return 3;
-    if (s === 'processing') return 2;
-    return 1; // Pending
+    if (s === 'packed') return 2;
+    return 1; // Order Placed (or Cancelled)
   };
 
   if (loading) {
@@ -211,7 +212,7 @@ const UserOrders = () => {
                           <div className="flex flex-col sm:flex-row justify-between gap-6 sm:gap-0 relative z-10">
                             {[
                               { step: 1, label: 'Order Placed', icon: Clock },
-                              { step: 2, label: 'Processing', icon: Box },
+                              { step: 2, label: 'Packed', icon: Box },
                               { step: 3, label: 'Shipped', icon: Truck },
                               { step: 4, label: 'Delivered', icon: CheckCircle2 },
                             ].map((s) => {
@@ -244,7 +245,7 @@ const UserOrders = () => {
                             <p className="font-bold text-gray-200 mb-1">{order.address.firstName} {order.address.lastName}</p>
                             <p className="text-gray-400 text-sm leading-relaxed">
                               {order.address.street}<br/>
-                              {order.address.city}, {order.address.state}<br/>
+                              {order.address.city}, {order.address.emirate}{order.address.poBox ? ` — PO Box ${order.address.poBox}` : ''}<br/>
                               {order.address.country}
                             </p>
                           </div>

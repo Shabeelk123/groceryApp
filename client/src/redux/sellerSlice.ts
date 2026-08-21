@@ -7,22 +7,24 @@ interface Seller {
 }
 
 interface Product {
+    id: number;
     name: string;
     category: string;
     price: number;
     offerPrice: number;
     inStock: boolean;
-    image: string;
+    image: string[];
 }
 
 interface Order {
     id: number;
-    items: { product: { name: string }, quantity: number }[];
-    address: { firstName: string, lastName: string, street: string, city: string, state: string, zipcode: string, country: string };
+    items: { product: { name: string }, quantity: number, price: number }[];
+    address: { firstName: string, lastName: string, street: string, city: string, emirate: string, poBox: string | null, country: string };
     amount: number;
     paymentType: string;
     createdAt: string;
     isPaid: boolean;
+    status: string;
 }
 
 interface SellerState {

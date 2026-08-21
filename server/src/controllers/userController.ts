@@ -35,7 +35,8 @@ export const registerUser = async (req: Request, res: Response) => {
             sameSite: process.env.NODE_ENV === "production" ? "none" : "strict", //csrf protection
             maxAge: 2 * 60 * 60 * 1000, //2 hour
         });
-        return res.status(201).json({ user });
+        const { password: _password, ...safeUser } = user;
+        return res.status(201).json({ user: safeUser });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to register user" });
@@ -69,7 +70,8 @@ export const loginUser = async (req: Request, res: Response) => {
             sameSite: process.env.NODE_ENV === "production" ? "none" : "strict", //csrf protection
             maxAge: 2 * 60 * 60 * 1000, //2 hour
         });
-        return res.status(200).json({ user });
+        const { password: _password, ...safeUser } = user;
+        return res.status(200).json({ user: safeUser });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to login user" });

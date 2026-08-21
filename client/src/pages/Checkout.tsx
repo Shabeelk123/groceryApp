@@ -38,16 +38,22 @@ const Checkout = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
+  const emptyAddressForm: Address = {
+    firstName: '', lastName: '', street: '', city: '', emirate: EMIRATES[0], poBox: '', country: 'United Arab Emirates', phone: '',
+  };
+
   const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [savedAddress, setSavedAddress] = useState<Address | null>(null);
-  const [useNewAddress, setUseNewAddress] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [deletingAddressId, setDeletingAddressId] = useState<number | null>(null);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'stripe'>('cod');
 
-  const [addressForm, setAddressForm] = useState<Address>({
-    firstName: '', lastName: '', street: '', city: '', emirate: EMIRATES[0], poBox: '', country: 'United Arab Emirates', phone: '',
-  });
+  const [addressForm, setAddressForm] = useState<Address>(emptyAddressForm);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -56,13 +62,15 @@ const Checkout = () => {
       try {
         const [productsRes, addressRes] = await Promise.all([
           axiosInstance.get('/api/products/list'),
-          axiosInstance.get('/api/address/list').catch(() => ({ data: { addresses: null } })),
+          axiosInstance.get('/api/address/list').catch(() => ({ data: { addresses: [] } })),
         ]);
         setAllProducts(productsRes.data.products || []);
-        if (addressRes.data.addresses) {
-          setSavedAddress(addressRes.data.addresses);
+        const addresses: Address[] = addressRes.data.addresses || [];
+        setSavedAddresses(addresses);
+        if (addresses.length > 0) {
+          setSelectedAddressId(addresses[0].id!);
         } else {
-          setUseNewAddress(true);
+          setShowAddressForm(true);
         }
       } catch {
         toast.error('Failed to load checkout data');
@@ -84,7 +92,8 @@ const Checkout = () => {
     }, []);
   })();
 
-  const activeEmirate = (useNewAddress || !savedAddress) ? addressForm.emirate : savedAddress.emirate;
+  const selectedAddress = savedAddresses.find((a) => a.id === selectedAddressId) || null;
+  const activeEmirate = showAddressForm ? addressForm.emirate : (selectedAddress?.emirate || '');
   const subtotal = cartItems.reduce((s, i) => s + i.offerPrice * i.quantity, 0);
   const tax = subtotal * VAT_RATE;
   const deliveryFee = getShippingFee(subtotal, activeEmirate);
@@ -92,6 +101,69 @@ const Checkout = () => {
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setAddressForm({ ...addressForm, [e.target.name]: e.target.value });
+  };
+
+  const startAddNewAddress = () => {
+    setEditingAddressId(null);
+    setAddressForm(emptyAddressForm);
+    setShowAddressForm(true);
+  };
+
+  const startEditAddress = (addr: Address) => {
+    setEditingAddressId(addr.id!);
+    setAddressForm({ ...addr });
+    setShowAddressForm(true);
+  };
+
+  const cancelAddressForm = () => {
+    setShowAddressForm(false);
+    setEditingAddressId(null);
+  };
+
+  const saveAddress = async () => {
+    const { firstName, lastName, street, city, emirate, country, phone } = addressForm;
+    if (!firstName || !lastName || !street || !city || !emirate || !country || !phone) {
+      toast.error('Please fill in all address fields');
+      return;
+    }
+    setSavingAddress(true);
+    try {
+      if (editingAddressId) {
+        const res = await axiosInstance.put(`/api/address/${editingAddressId}`, { address: addressForm });
+        const updated: Address = res.data.address;
+        setSavedAddresses(savedAddresses.map((a) => (a.id === editingAddressId ? updated : a)));
+        setSelectedAddressId(editingAddressId);
+      } else {
+        const res = await axiosInstance.post('/api/address/add', { userId: user!.id, address: addressForm });
+        const created: Address = res.data.address;
+        setSavedAddresses([created, ...savedAddresses]);
+        setSelectedAddressId(created.id!);
+      }
+      setShowAddressForm(false);
+      setEditingAddressId(null);
+    } catch {
+      toast.error('Failed to save address');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const removeAddress = async (id: number) => {
+    if (!window.confirm('Delete this address?')) return;
+    setDeletingAddressId(id);
+    try {
+      await axiosInstance.delete(`/api/address/${id}`);
+      const remaining = savedAddresses.filter((a) => a.id !== id);
+      setSavedAddresses(remaining);
+      if (selectedAddressId === id) {
+        setSelectedAddressId(remaining[0]?.id ?? null);
+      }
+      if (remaining.length === 0) setShowAddressForm(true);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to delete address');
+    } finally {
+      setDeletingAddressId(null);
+    }
   };
 
   const placeOrder = async () => {
@@ -107,25 +179,9 @@ const Checkout = () => {
       return;
     }
 
-    let addressId: number | undefined = savedAddress?.id;
-
-    if (useNewAddress || !addressId) {
-      const { firstName, lastName, street, city, emirate, country, phone } = addressForm;
-      if (!firstName || !lastName || !street || !city || !emirate || !country || !phone) {
-        toast.error('Please fill in all address fields');
-        return;
-      }
-      try {
-        const addrRes = await axiosInstance.post('/api/address/add', {
-          userId: user.id,
-          address: addressForm,
-        });
-        addressId = addrRes.data.addresses.id;
-        setSavedAddress(addrRes.data.addresses);
-      } catch {
-        toast.error('Failed to save address');
-        return;
-      }
+    if (!selectedAddressId || showAddressForm) {
+      toast.error('Please save a shipping address before placing your order');
+      return;
     }
 
     setPlacingOrder(true);
@@ -135,7 +191,7 @@ const Checkout = () => {
       }));
 
       await axiosInstance.post('/api/order/cod', {
-        userId: user.id, addressId, items,
+        userId: user.id, addressId: selectedAddressId, items,
       });
 
       dispatch(updateCartItems([]));
@@ -196,67 +252,107 @@ const Checkout = () => {
                   <div className="w-8 h-8 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">1</div>
                   Shipping Address
                 </h2>
-                {savedAddress && (
-                  <button 
-                    onClick={() => setUseNewAddress(!useNewAddress)}
+                {!showAddressForm && (
+                  <button
+                    onClick={startAddNewAddress}
                     className="text-xs font-bold text-amber-500 hover:text-amber-400 tracking-wide uppercase transition-colors"
                   >
-                    {useNewAddress ? 'Use Saved Address' : 'Add New Address'}
+                    + Add New Address
                   </button>
                 )}
               </div>
 
-              {savedAddress && !useNewAddress ? (
-                <div className="bg-[#111] border-2 border-amber-500/30 rounded-2xl p-5 relative group hover:border-amber-500/50 transition-colors">
-                  <div className="absolute top-5 right-5 text-amber-500">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-                  <div className="flex items-start gap-4">
-                    <MapPin className="w-5 h-5 text-gray-500 mt-1" />
-                    <div>
-                      <p className="font-bold text-gray-200 text-lg mb-1">{savedAddress.firstName} {savedAddress.lastName}</p>
-                      <p className="text-gray-400 text-sm leading-relaxed mb-2">
-                        {savedAddress.street}<br/>
-                        {savedAddress.city}, {savedAddress.emirate}{savedAddress.poBox ? ` — PO Box ${savedAddress.poBox}` : ''}<br/>
-                        {savedAddress.country}
-                      </p>
-                      <p className="text-gray-500 text-sm flex items-center gap-2">
-                        <span className="w-4 h-4 bg-[#222] rounded flex items-center justify-center text-[10px]">📞</span> 
-                        {savedAddress.phone}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['firstName', 'lastName', 'phone', 'street', 'city', 'emirate', 'poBox', 'country'].map((field) => (
-                    <div key={field} className={field === 'street' ? 'md:col-span-2' : ''}>
-                      <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                        {field.replace(/([A-Z])/g, ' $1')}{field === 'poBox' && <span className="normal-case font-normal text-gray-600"> (optional)</span>}
-                      </label>
-                      {field === 'emirate' ? (
-                        <select
-                          name={field}
-                          value={addressForm.emirate}
-                          onChange={handleAddressChange}
-                          className="w-full bg-[#111] border border-[#2a2a2a] text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 focus:bg-[#151515] transition-all"
-                        >
-                          {EMIRATES.map((emirate) => (
-                            <option key={emirate} value={emirate}>{emirate}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          name={field}
-                          value={(addressForm as any)[field]}
-                          onChange={handleAddressChange}
-                          className="w-full bg-[#111] border border-[#2a2a2a] text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 focus:bg-[#151515] transition-all"
-                          placeholder={field === 'poBox' ? 'PO Box / Makani number' : `Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
-                        />
+              {!showAddressForm ? (
+                <div className="space-y-3">
+                  {savedAddresses.map((addr) => (
+                    <div
+                      key={addr.id}
+                      onClick={() => setSelectedAddressId(addr.id!)}
+                      className={`cursor-pointer border-2 rounded-2xl p-5 relative transition-colors ${selectedAddressId === addr.id ? 'border-amber-500/50 bg-amber-500/5' : 'border-[#2a2a2a] bg-[#111] hover:border-[#333]'}`}
+                    >
+                      {selectedAddressId === addr.id && (
+                        <div className="absolute top-5 right-5 text-amber-500">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
                       )}
+                      <div className="flex items-start gap-4 pr-8">
+                        <MapPin className="w-5 h-5 text-gray-500 mt-1 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-200 text-lg mb-1">{addr.firstName} {addr.lastName}</p>
+                          <p className="text-gray-400 text-sm leading-relaxed mb-2">
+                            {addr.street}<br/>
+                            {addr.city}, {addr.emirate}{addr.poBox ? ` — PO Box ${addr.poBox}` : ''}<br/>
+                            {addr.country}
+                          </p>
+                          <p className="text-gray-500 text-sm flex items-center gap-2 mb-3">
+                            <span className="w-4 h-4 bg-[#222] rounded flex items-center justify-center text-[10px]">📞</span>
+                            {addr.phone}
+                          </p>
+                          <div className="flex gap-4 text-xs font-bold uppercase tracking-wide">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); startEditAddress(addr); }} className="text-amber-500 hover:text-amber-400">
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); removeAddress(addr.id!); }}
+                              disabled={deletingAddressId === addr.id}
+                              className="text-red-500 hover:text-red-400 disabled:opacity-50"
+                            >
+                              {deletingAddressId === addr.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
+                </div>
+              ) : (
+                <div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                    {['firstName', 'lastName', 'phone', 'street', 'city', 'emirate', 'poBox', 'country'].map((field) => (
+                      <div key={field} className={field === 'street' ? 'md:col-span-2' : ''}>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                          {field.replace(/([A-Z])/g, ' $1')}{field === 'poBox' && <span className="normal-case font-normal text-gray-600"> (optional)</span>}
+                        </label>
+                        {field === 'emirate' ? (
+                          <select
+                            name={field}
+                            value={addressForm.emirate}
+                            onChange={handleAddressChange}
+                            className="w-full bg-[#111] border border-[#2a2a2a] text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 focus:bg-[#151515] transition-all"
+                          >
+                            {EMIRATES.map((emirate) => (
+                              <option key={emirate} value={emirate}>{emirate}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            name={field}
+                            value={(addressForm as any)[field]}
+                            onChange={handleAddressChange}
+                            className="w-full bg-[#111] border border-[#2a2a2a] text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 focus:bg-[#151515] transition-all"
+                            placeholder={field === 'poBox' ? 'PO Box / Makani number' : `Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={saveAddress}
+                      disabled={savingAddress}
+                      className="bg-amber-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-amber-400 transition disabled:opacity-50"
+                    >
+                      {savingAddress ? 'Saving...' : editingAddressId ? 'Save Changes' : 'Save Address'}
+                    </button>
+                    {savedAddresses.length > 0 && (
+                      <button type="button" onClick={cancelAddressForm} className="text-gray-400 hover:text-white text-sm font-bold">
+                        Cancel
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -323,7 +419,7 @@ const Checkout = () => {
                     </div>
                   </div>
                   <div className={`overflow-hidden transition-all duration-300 px-5 ${paymentMethod === 'cod' ? 'max-h-24 pb-5 opacity-100' : 'max-h-0 opacity-0'}`}>
-                    <p className="text-sm text-gray-400 border-t border-[#2a2a2a] pt-4 mt-2">Pay securely with cash or UPI when your order is delivered to your doorstep.</p>
+                    <p className="text-sm text-gray-400 border-t border-[#2a2a2a] pt-4 mt-2">Pay securely with cash when your order is delivered to your doorstep.</p>
                   </div>
                   <input type="radio" className="hidden" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />
                 </label>
@@ -382,7 +478,7 @@ const Checkout = () => {
 
               <button
                 onClick={placeOrder}
-                disabled={placingOrder || cartItems.length === 0 || (paymentMethod === 'stripe')}
+                disabled={placingOrder || cartItems.length === 0 || paymentMethod === 'stripe' || !selectedAddressId || showAddressForm}
                 className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl font-extrabold text-lg transition-all ${
                   paymentMethod === 'stripe' 
                     ? 'bg-[#222] text-gray-500 cursor-not-allowed border border-[#333]' 

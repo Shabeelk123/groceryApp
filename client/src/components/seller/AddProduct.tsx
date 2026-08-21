@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import axiosInstance from "../../lib/axiosConfig";
 import toast from "react-hot-toast";
 
@@ -62,12 +63,35 @@ const CATEGORIES = Object.keys(CATEGORY_MODELS).concat([
   "Other Accessories",
 ]);
 
+const emptyForm = { name: "", description: "", category: "", model: "", price: "", offerPrice: "", inStock: "true" };
+
 const AddProduct = () => {
-  const [formData, setFormData] = useState({
-    name: "", description: "", category: "", model: "", price: "", offerPrice: "", inStock: "true",
-  });
+  const { id } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(id);
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState(emptyForm);
   const [files, setFiles] = useState<(File | null)[]>([null, null, null, null]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(isEditMode);
+
+  useEffect(() => {
+    if (!isEditMode) return;
+    axiosInstance.get(`/api/products/${id}`)
+      .then((res) => {
+        const p = res.data.product;
+        if (!p) { toast.error("Product not found"); navigate("/seller/productlist"); return; }
+        setFormData({
+          name: p.name, description: p.description, category: p.category,
+          model: p.model || "", price: String(p.price), offerPrice: String(p.offerPrice),
+          inStock: String(p.inStock),
+        });
+        setExistingImages(p.image || []);
+      })
+      .catch(() => toast.error("Failed to load product"))
+      .finally(() => setFetching(false));
+  }, [id, isEditMode, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const updated = { ...formData, [e.target.name]: e.target.value };
@@ -89,7 +113,7 @@ const AddProduct = () => {
       toast.error("Please fill all required fields"); return;
     }
     const selectedFiles = files.filter(Boolean) as File[];
-    if (selectedFiles.length === 0) { toast.error("Add at least one product image"); return; }
+    if (!isEditMode && selectedFiles.length === 0) { toast.error("Add at least one product image"); return; }
 
     setLoading(true);
     try {
@@ -102,28 +126,53 @@ const AddProduct = () => {
         inStock: formData.inStock === "true",
       }));
       selectedFiles.forEach((f) => data.append("images", f));
-      await axiosInstance.post("/api/products/add", data, { headers: { "Content-Type": "multipart/form-data" } });
-      toast.success("Product added!");
-      setFormData({ name: "", description: "", category: "", model: "", price: "", offerPrice: "", inStock: "true" });
-      setFiles([null, null, null, null]);
+
+      if (isEditMode) {
+        await axiosInstance.patch(`/api/products/${id}`, data, { headers: { "Content-Type": "multipart/form-data" } });
+        toast.success("Product updated!");
+        navigate("/seller/productlist");
+      } else {
+        await axiosInstance.post("/api/products/add", data, { headers: { "Content-Type": "multipart/form-data" } });
+        toast.success("Product added!");
+        setFormData(emptyForm);
+        setFiles([null, null, null, null]);
+      }
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || "Failed to add product");
+      toast.error(err?.response?.data?.error || `Failed to ${isEditMode ? "update" : "add"} product`);
     } finally { setLoading(false); }
   };
 
   const modelOptions = CATEGORY_MODELS[formData.category] || [];
 
+  if (fetching) {
+    return <div className="py-10 px-4 md:px-10 text-gray-500 text-sm">Loading product…</div>;
+  }
+
   return (
     <div className="py-10 px-4 md:px-10 max-w-2xl">
       <p className="text-xs text-amber-500 uppercase tracking-widest mb-1">Seller Dashboard</p>
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">Add New Product</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">{isEditMode ? "Edit Product" : "Add New Product"}</h2>
+        {isEditMode && (
+          <Link to="/seller/productlist" className="text-sm text-gray-500 hover:text-gray-800">← Back to list</Link>
+        )}
+      </div>
       <form onSubmit={handleSubmit} className="space-y-5">
 
         {/* Images */}
         <div>
           <p className="text-sm font-medium mb-2 text-gray-700">
-            Product Images <span className="text-gray-400">(up to 4)</span>
+            Product Images <span className="text-gray-400">(up to 4{isEditMode ? " — leave blank to keep existing" : ""})</span>
           </p>
+          {isEditMode && existingImages.length > 0 && (
+            <div className="flex flex-wrap gap-3 mb-3">
+              {existingImages.map((url, i) => (
+                <div key={i} className="w-24 h-24 border border-gray-200 rounded-xl overflow-hidden">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-3">
             {files.map((file, index) => (
               <label key={index} htmlFor={`image-${index}`} className="cursor-pointer">
@@ -209,7 +258,7 @@ const AddProduct = () => {
 
         <button type="submit" disabled={loading}
           className="bg-amber-500 text-black px-8 py-2.5 rounded-full font-bold hover:bg-amber-400 transition disabled:opacity-50 disabled:cursor-not-allowed">
-          {loading ? "Adding..." : "Add Product"}
+          {loading ? (isEditMode ? "Saving..." : "Adding...") : (isEditMode ? "Save Changes" : "Add Product")}
         </button>
       </form>
     </div>

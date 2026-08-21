@@ -8,27 +8,71 @@ export const addAddress = async (req: Request, res: Response) => {
         if (!userId || !address) {
             return res.status(400).json({ error: "Missing required fields" });
         }
-        const addresses = await prisma.address.create({ data: { userId, ...address } });
-        return res.status(200).json({ addresses });
+        const created = await prisma.address.create({ data: { userId, ...address } });
+        return res.status(200).json({ address: created });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to add address" });
     }
 };
 
-export const getAddress = async (req: Request, res: Response) => {
+// Lists all saved addresses for the user, newest first
+export const listAddresses = async (req: Request, res: Response) => {
     try {
         const userId = req.userId;
         if (!userId) {
             return res.status(400).json({ error: "Missing userId" });
         }
-        const addresses = await prisma.address.findFirst({
+        const addresses = await prisma.address.findMany({
             where: { userId },
             orderBy: { createdAt: "desc" },
         });
         return res.status(200).json({ addresses });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Failed to get address" });
+        res.status(500).json({ error: "Failed to get addresses" });
     }
-};
+};
+
+export const updateAddress = async (req: Request, res: Response) => {
+    try {
+        const userId = req.userId;
+        const { id } = req.params;
+        const { address } = req.body;
+        if (!address) {
+            return res.status(400).json({ error: "Missing address data" });
+        }
+
+        const existing = await prisma.address.findUnique({ where: { id: Number(id) } });
+        if (!existing || existing.userId !== userId) {
+            return res.status(404).json({ error: "Address not found" });
+        }
+
+        const updated = await prisma.address.update({ where: { id: Number(id) }, data: address });
+        return res.status(200).json({ address: updated });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update address" });
+    }
+};
+
+export const deleteAddress = async (req: Request, res: Response) => {
+    try {
+        const userId = req.userId;
+        const { id } = req.params;
+
+        const existing = await prisma.address.findUnique({ where: { id: Number(id) } });
+        if (!existing || existing.userId !== userId) {
+            return res.status(404).json({ error: "Address not found" });
+        }
+
+        await prisma.address.delete({ where: { id: Number(id) } });
+        return res.status(200).json({ success: true });
+    } catch (error: any) {
+        if (error?.code === "P2003") {
+            return res.status(400).json({ error: "Cannot delete an address that's attached to an existing order." });
+        }
+        console.error(error);
+        res.status(500).json({ error: "Failed to delete address" });
+    }
+};

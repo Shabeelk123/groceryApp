@@ -84,6 +84,23 @@ export const orderDetails = async (req: Request, res: Response) => {
     }
 };
 
+export const ORDER_STATUSES = ["Order Placed", "Packed", "Shipped", "Delivered", "Cancelled"];
+
+export const updateOrderStatus = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body;
+        if (!status || !ORDER_STATUSES.includes(status)) {
+            return res.status(400).json({ error: `Status must be one of: ${ORDER_STATUSES.join(", ")}` });
+        }
+        const order = await prisma.order.update({ where: { id: Number(id) }, data: { status } });
+        return res.status(200).json({ order });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update order status" });
+    }
+};
+
 // get all oreder of admin
 export const getAllOrders = async (req: Request, res: Response) => {
     try {

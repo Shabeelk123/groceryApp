@@ -14,7 +14,8 @@ const SellerLayout = () => {
   };
 
   const links = [
-    { name: "Add Product",   path: "/seller",             icon: "+" },
+    { name: "Dashboard",     path: "/seller",             icon: "📊" },
+    { name: "Add Product",   path: "/seller/add",         icon: "+" },
     { name: "Product List",  path: "/seller/productlist", icon: "☰" },
     { name: "Orders",        path: "/seller/orders",      icon: "📦" },
   ];

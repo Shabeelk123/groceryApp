@@ -16,6 +16,7 @@ import NotFound from './pages/NotFound';
 import CollectionPage from './pages/CollectionPage';
 import SellerLogin from './components/seller/SellerLogin';
 import SellerLayout from './pages/seller/SellerLayout';
+import Dashboard from './components/seller/Dashboard';
 import AddProduct from './components/seller/AddProduct';
 import ProductList from './components/seller/ProductList';
 import Orders from './components/seller/Orders';
@@ -62,7 +63,9 @@ const App = () => {
 
         {/* Seller routes */}
         <Route path="/seller" element={showSellerLogin ? <SellerLogin /> : <SellerLayout />}>
-          <Route index element={<AddProduct />} />
+          <Route index element={<Dashboard />} />
+          <Route path="add" element={<AddProduct />} />
+          <Route path="edit/:id" element={<AddProduct />} />
           <Route path="productlist" element={<ProductList />} />
           <Route path="orders" element={<Orders />} />
         </Route>

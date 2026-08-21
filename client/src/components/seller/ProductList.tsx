@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import type { RootState } from "../../store";
 import { setProducts } from "../../redux/sellerSlice";
 import axiosInstance from "../../lib/axiosConfig";
@@ -9,18 +10,23 @@ import toast from "react-hot-toast";
 const ProductList = () => {
     const dispatch = useDispatch();
     const { products } = useSelector((state: RootState) => state.seller);
+    const [search, setSearch] = useState("");
+    const [deletingId, setDeletingId] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await axiosInstance.get("/api/products/list");
+                const response = await axiosInstance.get("/api/products/list", {
+                    params: search ? { search } : undefined,
+                });
                 dispatch(setProducts(response.data.products || []));
             } catch {
                 toast.error("Failed to load products");
             }
         };
-        fetchProducts();
-    }, [dispatch]);
+        const debounce = setTimeout(fetchProducts, 300);
+        return () => clearTimeout(debounce);
+    }, [dispatch, search]);
 
     const toggleStock = async (id: number, currentStock: boolean) => {
         try {
@@ -35,14 +41,37 @@ const ProductList = () => {
         }
     };
 
+    const deleteProduct = async (id: number, name: string) => {
+        if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+        setDeletingId(id);
+        try {
+            await axiosInstance.delete(`/api/products/${id}`);
+            dispatch(setProducts(products.filter((p: any) => p.id !== id)));
+            toast.success("Product deleted");
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error || "Failed to delete product");
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     return (
         <div className="flex-1 py-10 px-4 md:px-10">
-            <h2 className="text-xl font-semibold mb-6">All Products ({products.length})</h2>
+            <div className="flex items-center justify-between mb-6 max-w-4xl">
+                <h2 className="text-xl font-semibold">All Products ({products.length})</h2>
+                <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search products..."
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+            </div>
 
             {products.length === 0 ? (
                 <div className="text-center py-16 text-gray-400">
                     <div className="text-5xl mb-3">📦</div>
-                    <p>No products yet. Add your first product!</p>
+                    <p>{search ? "No products match your search." : "No products yet. Add your first product!"}</p>
                 </div>
             ) : (
                 <div className="rounded-md border border-gray-200 overflow-hidden max-w-4xl">
@@ -54,6 +83,7 @@ const ProductList = () => {
                                 <th className="px-4 py-3 font-semibold hidden md:table-cell">MRP</th>
                                 <th className="px-4 py-3 font-semibold hidden md:table-cell">Offer Price</th>
                                 <th className="px-4 py-3 font-semibold">In Stock</th>
+                                <th className="px-4 py-3 font-semibold">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm text-gray-600 divide-y divide-gray-100">
@@ -81,6 +111,20 @@ const ProductList = () => {
                                             <div className="w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-green-500 transition-colors duration-200" />
                                             <span className="dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-5" />
                                         </label>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-3">
+                                            <Link to={`/seller/edit/${product.id}`} className="text-amber-600 hover:text-amber-800 font-medium">
+                                                Edit
+                                            </Link>
+                                            <button
+                                                onClick={() => deleteProduct(product.id, product.name)}
+                                                disabled={deletingId === product.id}
+                                                className="text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+                                            >
+                                                {deletingId === product.id ? "..." : "Delete"}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

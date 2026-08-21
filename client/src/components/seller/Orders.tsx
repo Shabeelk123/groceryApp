@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../store";
 import { setOrders } from "../../redux/sellerSlice";
@@ -6,9 +6,20 @@ import axiosInstance from "../../lib/axiosConfig";
 import { formatCurrency } from "../../utils/commonUtils";
 import toast from "react-hot-toast";
 
+const ORDER_STATUSES = ["Order Placed", "Packed", "Shipped", "Delivered", "Cancelled"];
+
+const STATUS_COLORS: Record<string, string> = {
+    "Order Placed": "bg-blue-100 text-blue-700",
+    "Packed": "bg-purple-100 text-purple-700",
+    "Shipped": "bg-amber-100 text-amber-700",
+    "Delivered": "bg-green-100 text-green-700",
+    "Cancelled": "bg-red-100 text-red-700",
+};
+
 const Orders = () => {
     const dispatch = useDispatch();
     const { orders } = useSelector((state: RootState) => state.seller);
+    const [updatingId, setUpdatingId] = useState<number | null>(null);
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -21,6 +32,19 @@ const Orders = () => {
         };
         fetchOrders();
     }, [dispatch]);
+
+    const updateStatus = async (orderId: number, status: string) => {
+        setUpdatingId(orderId);
+        try {
+            await axiosInstance.patch(`/api/order/${orderId}/status`, { status });
+            dispatch(setOrders(orders.map((o) => (o.id === orderId ? { ...o, status } : o))));
+            toast.success("Order status updated");
+        } catch {
+            toast.error("Failed to update order status");
+        } finally {
+            setUpdatingId(null);
+        }
+    };
 
     return (
         <div className="py-10 px-4 md:px-10">
@@ -51,7 +75,7 @@ const Orders = () => {
                             {/* Address */}
                             <div className="text-sm text-gray-500 min-w-0">
                                 <p className="font-medium text-gray-700">{order.address.firstName} {order.address.lastName}</p>
-                                <p className="truncate">{order.address.street}, {order.address.city}</p>
+                                <p className="truncate">{order.address.street}, {order.address.city}, {order.address.emirate}</p>
                             </div>
 
                             {/* Amount */}
@@ -66,6 +90,20 @@ const Orders = () => {
                                 }`}>
                                     {order.isPaid ? "Paid" : "COD Pending"}
                                 </span>
+                            </div>
+
+                            {/* Status */}
+                            <div className="flex-shrink-0">
+                                <select
+                                    value={order.status}
+                                    disabled={updatingId === order.id}
+                                    onChange={(e) => updateStatus(order.id, e.target.value)}
+                                    className={`text-xs font-medium rounded-full px-2 py-1 border-0 focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-50 ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700'}`}
+                                >
+                                    {ORDER_STATUSES.map((s) => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     ))}

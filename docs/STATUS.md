@@ -31,9 +31,11 @@ model (not multi-vendor).
 - `JWT_SECRET` is required at startup (`server/src/configs/env.ts`) — the server refuses to boot instead of silently falling back to a guessable secret
 
 **Admin (seller) panel**
-- Add product with multi-image upload to Cloudinary (JPEG/PNG/WebP only, 5MB/6-file limits)
-- Product list view, toggle in-stock/out-of-stock
-- View all orders
+- Dashboard (`/seller`, new index route) with orders-today, revenue, pending-orders, and out-of-stock stat tiles
+- Add product with multi-image upload to Cloudinary (JPEG/PNG/WebP only, 5MB/6-file limits) — now at `/seller/add`
+- Full product **edit** (`/seller/edit/:id`, reuses the add form) and **delete**, with delete blocked by a clean 400 (not a raw DB error) if the product has existing orders
+- Product list view with search, toggle in-stock/out-of-stock
+- View all orders, update order status (Order Placed → Packed → Shipped → Delivered, or Cancelled)
 
 **Regionalization (Dubai/UAE)**
 - Currency is AED everywhere via `formatCurrency()` — no hardcoded `₹` left in the codebase
@@ -42,22 +44,25 @@ model (not multi-vendor).
 - Emirate-based shipping: free above AED 200, flat AED 15 within Dubai, AED 25 for other Emirates — calculated identically on client (checkout display) and server (order total), see `client/src/utils/commonUtils.ts` and `server/src/utils/pricing.ts`
 - Server now verifies the order's address actually belongs to the requesting user, and the delivery fee is included in the stored order total (previously it was computed on the client for display but silently dropped from the number actually saved)
 
+**Customer account**
+- Multiple saved addresses: list, select at checkout, edit, delete — all ownership-checked server-side (a user can't read/edit/delete another user's address)
+
 **Infra**
 - `.env` files correctly gitignored in both `client/` and `server/` (verified — not tracked in git)
 - `.env.example` exists in both packages
 - CORS configured with an origin allowlist (not `*`)
 - Cookies set `httpOnly`, `secure` in production, `sameSite` adjusted per environment
+- `registerUser`/`loginUser` no longer echo the bcrypt password hash back in the response body (found and fixed while testing the address endpoints)
 
 ---
 
 ## ⚠️ Partially done / stubbed — looks finished, isn't
 
 - **Card payment at checkout is a visual-only stub.** The UI has a Stripe-style card form, but it's `disabled`, nothing calls Stripe, and the place-order button is disabled whenever "card" is selected (`client/src/pages/Checkout.tsx`). `stripe` is in `server/package.json` but is never imported anywhere in `server/src`. Right now **cash-on-delivery is the only way to actually complete an order.**
-- **Existing seeded products are still priced as if they were ₹, not AED.** The ~15 products in the DB have prices like `3700`, `6900` — clearly denominated in rupees, now displayed as literal AED (e.g. "AED 6,900" ≈ $1,880 for a phone case). This needs a manual re-price pass through the admin panel; it wasn't touched automatically since it's a business pricing decision, not a formatting bug.
-- **One address per user.** `addAddress` always creates a new row; `getAddress` just returns the most recently created one. There's no edit, no delete, no "choose from saved addresses" list — checkout silently uses whichever address was created last.
-- **Admin can't edit or delete products.** Only `add` and stock-toggle (`PUT /api/products/:id` only touches `inStock`) exist. No way to fix a price/description/image typo without touching the DB directly.
-- **No pagination or server-side filtering.** `GET /api/products/list` returns the entire product table; all search/sort/filter in `Products.tsx` happens client-side over that full list. Fine at 30 products, breaks down once the catalog grows.
+- **Existing seeded products are still priced as if they were ₹, not AED.** The 12 products in the DB have prices like `3700`, `6900` — clearly denominated in rupees, now displayed as literal AED (e.g. "AED 6,900" ≈ $1,880 for a phone case). This needs a manual re-price pass through the admin panel; it wasn't touched automatically since it's a business pricing decision, not a formatting bug.
+- **`Products.tsx` (public storefront) still filters/sorts/searches entirely client-side**, even though `GET /api/products/list` now supports `?page=&limit=&search=&category=&sort=` (used by the seller admin panel). This was a deliberate scoping decision, not an oversight — converting the public browsing UX to paginated loading is a real design change (infinite scroll vs. pages, per-filter loading states) that deserves its own pass. Fine at the current catalog size (~12 products); revisit once it grows.
 - **Cart model is a hack.** `User.cartItems` is `String[]` — quantity is represented by repeating the same product ID N times (`client/src/pages/Checkout.tsx` rebuilds counts by tallying duplicates). No cart line-item table, no per-item cart timestamps, no server-side stock check when adding to cart or placing an order.
+- **No inventory quantity tracking**, still just boolean `inStock`. Deliberately deferred out of the Phase 3 admin-panel work — doing it properly means a schema change plus a stock-decrement step in order placement, which belongs alongside the Phase 2 "stock re-check at order time" / DB-transaction work, not bolted onto the admin panel separately.
 - **Product detail page is heavily mocked**: colors, sizes, compatibility list, spec sheet, reviews, and FAQ on `ProductDetail.tsx` are all `MOCK_*` constants, not real data — none of these fields exist on the `Product` model, and there's no reviews table/endpoint. The reviews shown to customers right now are fake.
 - **Coupon/promo code field on Cart page is UI-only** — `couponCode` state exists, no backend coupon model or endpoint to apply it against.
 - **`Products.tsx` filter UI (`MOCK_FILTERS`) offers colors/brands/materials that don't exist on the Product model** — the code even has a comment acknowledging this. Filtering only actually works for category, price, and in-stock/search.
@@ -76,9 +81,7 @@ model (not multi-vendor).
 - No product reviews/ratings
 - No wishlist
 - No coupon/discount codes
-- No inventory quantity tracking (only boolean `inStock`)
-- No low-stock alerts for admin
-- No order status transitions from admin side (no "mark as shipped/delivered" flow found beyond the default status string)
+- No low-stock alerts for admin (would need inventory quantity tracking first — see above)
 - No email notifications (order confirmation, shipping update, password reset)
 - No forgot-password / reset-password flow
 - No CSV/bulk product import
@@ -115,9 +118,12 @@ model (not multi-vendor).
 | VAT calculation | Done (5%) | — |
 | Emirate-based shipping | Done | — |
 | Existing product prices re-denominated to AED | **Not done** — still ₹-scale numbers | **Yes** |
-| Admin product edit/delete | Missing | **Yes** |
-| Multiple saved addresses | Missing (1 only) | Should-have |
-| Security hardening (rate limit, request validation) | Partially done (JWT secret fixed; rate limiting/zod still missing) | **Yes** |
+| Admin product edit/delete | Done | — |
+| Multiple saved addresses | Done | — |
+| Order status management | Done | — |
+| Admin dashboard stats | Done (basic) | — |
+| Inventory quantity tracking | Missing — deferred to pair with Phase 2 stock-recheck work | Should-have |
+| Security hardening (rate limit, request validation) | Partially done (JWT secret fixed, password-hash leak fixed; rate limiting/zod still missing) | **Yes** |
 | Tests | None | Should-have before scaling team |
 | Legal pages | None | **Yes** (UAE consumer protection) |
 | Deployment/CI | None | **Yes** |
