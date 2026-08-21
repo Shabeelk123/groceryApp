@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response, RequestHandler } from "express";
 import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../configs/env";
 
 interface JwtPayload {
     id: number;
@@ -24,7 +25,7 @@ const authUser: RequestHandler = (req: Request, res: Response, next: NextFunctio
     }
     
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as JwtPayload;
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
         
         if (decoded.id) {
             // Set userId on the request object instead of req.body

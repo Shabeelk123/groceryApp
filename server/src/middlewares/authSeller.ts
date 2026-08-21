@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../configs/env";
 
 interface JwtPayload {
     email: string;
@@ -16,7 +17,7 @@ const authSeller = (req: Request, res: Response, next: NextFunction) => {
     }
     
     try {
-        const decoded = jwt.verify(sellerToken, process.env.JWT_SECRET || "secret") as JwtPayload;
+        const decoded = jwt.verify(sellerToken, JWT_SECRET) as JwtPayload;
         
         if (decoded.email === process.env.SELLER_EMAIL) {
             next();

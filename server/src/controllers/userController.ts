@@ -2,6 +2,7 @@ import prisma from "../configs/db";
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../configs/env";
 
 export const registerUser = async (req: Request, res: Response) => {
     try {
@@ -25,7 +26,7 @@ export const registerUser = async (req: Request, res: Response) => {
             },
         });
         //token
-        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || "secret", {
+        const token = jwt.sign({ id: user.id }, JWT_SECRET, {
             expiresIn: "2h",
         });
         res.cookie("token", token, {
@@ -59,7 +60,7 @@ export const loginUser = async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Invalid password" });
         }
 
-        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || "secret", {
+        const token = jwt.sign({ id: user.id }, JWT_SECRET, {
             expiresIn: "2h",
         });
         res.cookie("token", token, {

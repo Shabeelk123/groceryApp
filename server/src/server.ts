@@ -1,6 +1,13 @@
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
+
+// Must run before any local module is imported below — several of them (JWT
+// signing/verification in particular) read env vars at module load time via
+// ./configs/env, and imports are require()'d in file order under CommonJS.
+dotenv.config();
+
+import express, { NextFunction, Request, Response } from "express";
+import multer from "multer";
+import cors from "cors";
 import userRouter from "./routes/userRoute";
 import cookieParser from "cookie-parser";
 import sellerRouter from "./routes/sellerRoute";
@@ -9,9 +16,6 @@ import productRouter from "./routes/productRoute";
 import cartRouter from "./routes/cartRoute";
 import addressRouter from "./routes/addressRoute";
 import orderRouter from "./routes/orderRoute";
-
-// Load environment variables first
-dotenv.config();
 
 const app = express();
 
@@ -56,6 +60,14 @@ app.use("/api/products", productRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/address", addressRouter);
 app.use("/api/order", orderRouter);
+
+// Handles multer errors (bad file type, too large, too many files) with a clean 400
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+    if (err instanceof multer.MulterError || (err instanceof Error && err.message.includes("images are allowed"))) {
+        return res.status(400).json({ error: err.message });
+    }
+    next(err);
+});
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

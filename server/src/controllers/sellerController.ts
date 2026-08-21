@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../configs/env";
 interface JwtPayload {
     email: string;
     iat?: number;
@@ -13,7 +14,7 @@ export const sellerLogin = async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Missing required fields" });
         }
         if(password===process.env.SELLER_PASSWORD && email===process.env.SELLER_EMAIL){
-            const token = jwt.sign({ email }, process.env.JWT_SECRET || "secret", {
+            const token = jwt.sign({ email }, JWT_SECRET, {
                 expiresIn: "2h",
             });
             res.cookie("sellerToken", token, {
@@ -24,6 +25,7 @@ export const sellerLogin = async (req: Request, res: Response) => {
             });
             return res.status(200).json({ message: "Seller logged in successfully" });
         }
+        return res.status(401).json({ error: "Invalid email or password" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to login seller" });
@@ -37,7 +39,7 @@ export const sellerAuth = (req: Request, res: Response) => {
         return res.status(401).json({ error: "Unauthorized - No token provided" });
     }
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret") as JwtPayload;
+        const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
         if (decoded.email === process.env.SELLER_EMAIL) {
             return res.status(200).json({success: true, message: "Seller authenticated successfully" });
         } else {

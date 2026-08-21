@@ -32,7 +32,7 @@ const App = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await axiosInstance.get('/api/users/auth');
+        const response = await axiosInstance.get('/api/users/is-auth');
         if (response.data?.user) {
           dispatch(setUser(response.data.user));
         }

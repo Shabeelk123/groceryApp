@@ -18,7 +18,8 @@ const Home = () => {
   useEffect(() => {
     axiosInstance.get('/api/products/list')
       .then((res) => {
-        const cats: string[] = [...new Set((res.data.products || []).map((p: any) => p.category))];
+        const products: { category: string }[] = res.data.products || [];
+        const cats: string[] = [...new Set(products.map((p) => p.category))];
         setLiveCategories(cats);
       })
       .catch(() => { });
