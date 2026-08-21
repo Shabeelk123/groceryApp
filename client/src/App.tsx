@@ -10,8 +10,11 @@ import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import UserOrders from './pages/UserOrders';
 import Checkout from './pages/Checkout';
+import Wishlist from './pages/Wishlist';
 import NotFound from './pages/NotFound';
 import CollectionPage from './pages/CollectionPage';
 import SellerLogin from './components/seller/SellerLogin';
@@ -21,7 +24,7 @@ import AddProduct from './components/seller/AddProduct';
 import ProductList from './components/seller/ProductList';
 import Orders from './components/seller/Orders';
 import { useAppDispatch } from './hooks';
-import { setUser } from './redux/userSlice';
+import { setUser, setWishlist } from './redux/userSlice';
 import axiosInstance from './lib/axiosConfig';
 import type { RootState } from './store';
 
@@ -36,6 +39,12 @@ const App = () => {
         const response = await axiosInstance.get('/api/users/is-auth');
         if (response.data?.user) {
           dispatch(setUser(response.data.user));
+          try {
+            const wishlistRes = await axiosInstance.get('/api/wishlist');
+            dispatch(setWishlist((wishlistRes.data.items || []).map((i: { productId: number }) => i.productId)));
+          } catch {
+            // Non-critical — wishlist state just won't be pre-populated this session
+          }
         }
       } catch {
         // No valid session — user stays logged out, 401 interceptor handles cleanup
@@ -55,11 +64,14 @@ const App = () => {
         <Route path="/product/:id" element={<ProductDetail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected routes — require login */}
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><UserOrders /></ProtectedRoute>} />
+        <Route path="/wishlist" element={<ProtectedRoute><Wishlist /></ProtectedRoute>} />
 
         {/* Seller routes */}
         <Route path="/seller" element={showSellerLogin ? <SellerLogin /> : <SellerLayout />}>

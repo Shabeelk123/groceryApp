@@ -55,7 +55,10 @@ const Login = () => {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1.5">Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs text-gray-400 uppercase tracking-wide">Password</label>
+                <Link to="/forgot-password" className="text-xs text-amber-400 hover:text-amber-300 transition">Forgot password?</Link>
+              </div>
               <input
                 id="password" name="password" type="password" required
                 value={formData.password} onChange={handleChange}

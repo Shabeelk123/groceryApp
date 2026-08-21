@@ -14,13 +14,17 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  cartItems String[] // stores an array of items
+  id               Int       @id @default(autoincrement())
+  name             String
+  email            String    @unique
+  password         String
+  cartItems        String[] // stores an array of items
+  resetTokenHash   String?   // sha256 hash of the active password-reset token, if any
+  resetTokenExpiry DateTime? // reset link expires 1 hour after being issued
   addresses Address[]
   orders    Order[]
+  reviews   Review[]
+  wishlist  Wishlist[]
   @@map("users")
 }
 
@@ -35,9 +39,39 @@ model Product {
     category   String
     model      String?     // Device model compatibility (e.g. "iPhone 17 Pro Max")
     orderItems OrderItem[] // relation to OrderItem model
+    reviews    Review[]
+    wishlistedBy Wishlist[]
     createdAt  DateTime    @default(now())
     updatedAt  DateTime    @updatedAt
     @@map("products")
+}
+
+model Review {
+    id               Int      @id @default(autoincrement())
+    userId           Int
+    user             User     @relation(fields: [userId], references: [id])
+    productId        Int
+    product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+    rating           Int      // 1-5
+    comment          String
+    verifiedPurchase Boolean  @default(false)
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @updatedAt
+
+    @@unique([userId, productId]) // one review per user per product
+    @@map("reviews")
+}
+
+model Wishlist {
+    id        Int      @id @default(autoincrement())
+    userId    Int
+    user      User     @relation(fields: [userId], references: [id])
+    productId Int
+    product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+
+    @@unique([userId, productId]) // a product can only be wishlisted once per user
+    @@map("wishlists")
 }
 
 model Address {

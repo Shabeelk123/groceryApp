@@ -13,6 +13,15 @@ export const loginSchema = z.object({
     password: z.string().min(1, "Password is required"),
 });
 
+export const forgotPasswordSchema = z.object({
+    email: z.string().trim().toLowerCase().email("Invalid email address"),
+});
+
+export const resetPasswordSchema = z.object({
+    token: z.string().min(1, "Reset token is required"),
+    newPassword: z.string().min(6, "Password must be at least 6 characters"),
+});
+
 export const sellerLoginSchema = z.object({
     email: z.string().trim().toLowerCase().email("Invalid email address"),
     password: z.string().min(1, "Password is required"),
@@ -65,6 +74,16 @@ export const placeOrderSchema = z.object({
 
 export const updateOrderStatusSchema = z.object({
     status: z.enum(["Order Placed", "Packed", "Shipped", "Delivered", "Cancelled"]),
+});
+
+export const createReviewSchema = z.object({
+    productId: z.number().int().positive(),
+    rating: z.number().int().min(1, "Rating must be between 1 and 5").max(5, "Rating must be between 1 and 5"),
+    comment: z.string().trim().min(1, "Please write a comment").max(1000, "Comment is too long"),
+});
+
+export const wishlistAddSchema = z.object({
+    productId: z.number().int().positive(),
 });
 
 export const cartUpdateSchema = z.object({

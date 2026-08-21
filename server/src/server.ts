@@ -19,6 +19,8 @@ import productRouter from "./routes/productRoute";
 import cartRouter from "./routes/cartRoute";
 import addressRouter from "./routes/addressRoute";
 import orderRouter from "./routes/orderRoute";
+import reviewRouter from "./routes/reviewRoute";
+import wishlistRouter from "./routes/wishlistRoute";
 
 const app = express();
 
@@ -65,6 +67,8 @@ app.use("/api/products", productRouter);
 app.use("/api/cart", cartRouter);
 app.use("/api/address", addressRouter);
 app.use("/api/order", orderRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/api/wishlist", wishlistRouter);
 
 // Handles multer errors (bad file type, too large, too many files) with a clean 400
 app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {

@@ -2,6 +2,7 @@ import prisma from "../configs/db";
 import { Request, Response } from "express";
 import { VAT_RATE, getShippingFee } from "../utils/pricing";
 import logger from "../configs/logger";
+import { sendEmail } from "../configs/email";
 
 export const placeOrderCOD = async (req: Request, res: Response) => {
     try {
@@ -46,6 +47,20 @@ export const placeOrderCOD = async (req: Request, res: Response) => {
                 isPaid: false,
             },
         });
+
+        try {
+            const orderer = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true } });
+            if (orderer) {
+                await sendEmail({
+                    to: orderer.email,
+                    subject: `Order Confirmed — #${order.id}`,
+                    text: `Hi ${orderer.name}, your order #${order.id} for AED ${totalAmount.toFixed(2)} has been placed (Cash on Delivery). We'll email you when it ships.`,
+                });
+            }
+        } catch (emailError) {
+            logger.error(emailError, "Failed to send order confirmation email");
+        }
+
         return res.status(201).json({ success: true, order });
     } catch (error) {
         logger.error(error);
@@ -89,8 +104,24 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
-        const order = await prisma.order.update({ where: { id: Number(id) }, data: { status } });
-        return res.status(200).json({ order });
+        const order = await prisma.order.update({
+            where: { id: Number(id) },
+            data: { status },
+            include: { user: { select: { email: true, name: true } } },
+        });
+
+        try {
+            await sendEmail({
+                to: order.user.email,
+                subject: `Order #${order.id} update: ${status}`,
+                text: `Hi ${order.user.name}, your order #${order.id} status has been updated to: ${status}.`,
+            });
+        } catch (emailError) {
+            logger.error(emailError, "Failed to send order status update email");
+        }
+
+        const { user, ...orderData } = order;
+        return res.status(200).json({ order: orderData });
     } catch (error) {
         logger.error(error);
         res.status(500).json({ error: "Failed to update order status" });

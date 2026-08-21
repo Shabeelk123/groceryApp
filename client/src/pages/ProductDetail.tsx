@@ -4,6 +4,7 @@ import axiosInstance from '../lib/axiosConfig';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { updateCartItems } from '../redux/userSlice';
 import { formatCurrency, FREE_SHIPPING_THRESHOLD, DUBAI_SHIPPING_FEE, OTHER_EMIRATES_SHIPPING_FEE } from '../utils/commonUtils';
+import { toggleWishlist } from '../utils/wishlistActions';
 import toast from 'react-hot-toast';
 import { 
   Star, Truck, ShieldCheck, ChevronRight, ChevronDown,
@@ -19,27 +20,20 @@ interface Product {
   category: string;
   description: string;
   inStock: boolean;
+  model?: string | null;
 }
 
-// Mock Data for UI features
-const MOCK_COLORS = [
-  { name: 'Midnight Black', hex: '#111111' },
-  { name: 'Saddle Brown', hex: '#654321' },
-  { name: 'Titanium Gray', hex: '#878681' },
-];
-const MOCK_SIZES = ['Standard', 'Pro', 'Max', 'Ultra'];
-const MOCK_COMPATIBILITY = ['Apple iPhone 15 Series', 'Apple iPhone 14 Series', 'MagSafe Compatible'];
-const MOCK_SPECS = [
-  { label: 'Material', value: 'Premium Aramid Fiber & Vegan Leather' },
-  { label: 'Weight', value: '32g (Ultra-light)' },
-  { label: 'Drop Protection', value: 'Military Grade (10ft)' },
-  { label: 'MagSafe', value: 'Built-in N52 Magnets' },
-  { label: 'Warranty', value: '1 Year Limited Warranty' },
-];
-const MOCK_REVIEWS = [
-  { id: 1, user: 'Alex D.', rating: 5, date: 'Oct 12, 2026', text: 'Absolutely love the quality. The texture feels premium and it snaps onto the MagSafe charger perfectly.' },
-  { id: 2, user: 'Sarah M.', rating: 4, date: 'Sep 28, 2026', text: 'Great case, very slim. Only wish there were more color options available.' },
-];
+interface Review {
+  id: number;
+  userId: number;
+  rating: number;
+  comment: string;
+  verifiedPurchase: boolean;
+  createdAt: string;
+  user: { name: string };
+}
+
+// Generic informational copy, not tied to a specific product's real attributes
 const MOCK_FAQ = [
   { q: 'Is this compatible with wireless charging?', a: 'Yes, fully compatible with all standard Qi wireless chargers and MagSafe accessories.' },
   { q: 'Does it have a raised lip for screen protection?', a: 'Yes, it features a 1.2mm raised bezel to protect both the screen and the camera lenses.' },
@@ -65,6 +59,7 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.user.user);
+  const wishlist = useAppSelector((state) => state.user.wishlist);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
@@ -74,11 +69,17 @@ const ProductDetail = () => {
   const [activeImage, setActiveImage] = useState(0);
   
   // UI States
-  const [selectedColor, setSelectedColor] = useState(MOCK_COLORS[0].name);
-  const [selectedSize, setSelectedSize] = useState(MOCK_SIZES[1]);
   const [zoomStyle, setZoomStyle] = useState({ transformOrigin: '50% 50%', transform: 'scale(1)' });
   const [showStickyBar, setShowStickyBar] = useState(false);
   const addToCartRef = useRef<HTMLButtonElement>(null);
+
+  // Reviews
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -96,6 +97,53 @@ const ProductDetail = () => {
       .catch(() => { toast.error('Product not found'); navigate('/products'); })
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  const fetchReviews = () => {
+    axiosInstance.get(`/api/reviews/product/${id}`)
+      .then((res) => {
+        setReviews(res.data.reviews || []);
+        setAvgRating(res.data.avgRating || 0);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchReviews();
+    setShowReviewForm(false);
+    setNewRating(5);
+    setNewComment('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const myReview = reviews.find((r) => r.userId === user?.id);
+
+  const submitReview = async () => {
+    if (!user) { toast.error('Please login to write a review'); return; }
+    if (!newComment.trim()) { toast.error('Please write a comment'); return; }
+    setSubmittingReview(true);
+    try {
+      await axiosInstance.post('/api/reviews', { productId: Number(id), rating: newRating, comment: newComment.trim() });
+      toast.success('Review submitted!');
+      setShowReviewForm(false);
+      setNewComment('');
+      fetchReviews();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const deleteMyReview = async () => {
+    if (!myReview) return;
+    try {
+      await axiosInstance.delete(`/api/reviews/${myReview.id}`);
+      toast.success('Review deleted');
+      fetchReviews();
+    } catch {
+      toast.error('Failed to delete review');
+    }
+  };
 
   // Sticky Bar Scroll Listener
   useEffect(() => {
@@ -186,8 +234,14 @@ const ProductDetail = () => {
                   </span>
                 )}
                 <div className="absolute top-6 right-6 z-20 flex flex-col gap-3">
-                  <button className="w-10 h-10 rounded-full bg-[#111]/80 backdrop-blur-md border border-[#2a2a2a] flex items-center justify-center text-gray-300 hover:text-amber-400 hover:border-amber-400/50 transition-colors shadow-xl">
-                    <Heart className="w-5 h-5" />
+                  <button
+                    onClick={() => {
+                      if (!user) { toast.error('Please login to save items'); return; }
+                      toggleWishlist(product.id, wishlist.includes(product.id), dispatch);
+                    }}
+                    className={`w-10 h-10 rounded-full bg-[#111]/80 backdrop-blur-md border flex items-center justify-center transition-colors shadow-xl ${wishlist.includes(product.id) ? 'text-amber-400 border-amber-400/50' : 'text-gray-300 border-[#2a2a2a] hover:text-amber-400 hover:border-amber-400/50'}`}
+                  >
+                    <Heart className={`w-5 h-5 ${wishlist.includes(product.id) ? 'fill-current' : ''}`} />
                   </button>
                   <button className="w-10 h-10 rounded-full bg-[#111]/80 backdrop-blur-md border border-[#2a2a2a] flex items-center justify-center text-gray-300 hover:text-amber-400 hover:border-amber-400/50 transition-colors shadow-xl">
                     <Share2 className="w-5 h-5" />
@@ -232,13 +286,17 @@ const ProductDetail = () => {
               
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex items-center gap-1 text-amber-400">
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 fill-current" />
-                  <Star className="w-4 h-4 text-gray-600" />
-                  <span className="text-white text-sm font-semibold ml-1">4.8</span>
-                  <span className="text-gray-500 text-sm underline cursor-pointer hover:text-amber-400 transition-colors ml-2">(124 reviews)</span>
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className={`w-4 h-4 ${i < Math.round(avgRating) ? 'fill-current' : 'text-gray-600'}`} />
+                  ))}
+                  {reviews.length > 0 ? (
+                    <>
+                      <span className="text-white text-sm font-semibold ml-1">{avgRating.toFixed(1)}</span>
+                      <span className="text-gray-500 text-sm ml-2">({reviews.length} review{reviews.length !== 1 ? 's' : ''})</span>
+                    </>
+                  ) : (
+                    <span className="text-gray-500 text-sm ml-2">No reviews yet</span>
+                  )}
                 </div>
               </div>
 
@@ -248,65 +306,15 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Colors (UI Mock) */}
-            <div className="mb-8 border-t border-[#1e1e1e] pt-8">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">Color</h3>
-                <span className="text-sm text-gray-400">{selectedColor}</span>
+            {/* Compatibility — real data (product.model), no fake color/size selectors */}
+            {product.model && (
+              <div className="mb-8 border-t border-[#1e1e1e] pt-8">
+                <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-3">Compatibility</h3>
+                <span className="bg-[#111] border border-[#2a2a2a] text-gray-200 text-sm font-semibold px-4 py-2 rounded-lg inline-flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> {product.model}
+                </span>
               </div>
-              <div className="flex gap-3">
-                {MOCK_COLORS.map(color => (
-                  <button
-                    key={color.name}
-                    onClick={() => setSelectedColor(color.name)}
-                    className={`w-10 h-10 rounded-full border-2 transition-all duration-300 relative ${
-                      selectedColor === color.name ? 'border-amber-400 scale-110' : 'border-transparent hover:scale-110 ring-1 ring-[#333]'
-                    }`}
-                    style={{ backgroundColor: color.hex }}
-                    title={color.name}
-                  >
-                    {selectedColor === color.name && (
-                      <span className="absolute inset-0 border-2 border-[#050505] rounded-full"></span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Sizes (UI Mock) */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider">Model / Size</h3>
-                <button className="text-xs text-amber-500 hover:text-amber-400 underline transition-colors">Size Guide</button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {MOCK_SIZES.map(size => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`py-3 rounded-xl text-sm font-bold transition-all duration-300 border ${
-                      selectedSize === size 
-                        ? 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]' 
-                        : 'bg-[#111] border-[#2a2a2a] text-gray-400 hover:border-gray-500 hover:text-white'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Compatibility (UI Mock) */}
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-3">Compatibility</h3>
-              <div className="flex flex-wrap gap-2">
-                {MOCK_COMPATIBILITY.map(c => (
-                  <span key={c} className="bg-[#111] border border-[#2a2a2a] text-gray-400 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> {c}
-                  </span>
-                ))}
-              </div>
-            </div>
+            )}
 
             {/* Add to Cart Actions */}
             <div className="bg-[#0a0a0a] border border-[#1e1e1e] rounded-3xl p-6 mb-8 shadow-2xl relative overflow-hidden">
@@ -368,17 +376,6 @@ const ProductDetail = () => {
             <div className="border-t border-[#1e1e1e]">
               <Accordion title="Description" defaultOpen={true}>
                 {product.description || 'Elevate your device experience with our premium accessories. Crafted from top-tier materials, this product offers unparalleled protection without compromising on sleek aesthetics. Designed precisely for your device, it ensures perfect fit and functionality.'}
-              </Accordion>
-              
-              <Accordion title="Specifications">
-                <ul className="space-y-3">
-                  {MOCK_SPECS.map(spec => (
-                    <li key={spec.label} className="flex justify-between border-b border-[#1e1e1e] pb-2 last:border-0">
-                      <span className="text-gray-500">{spec.label}</span>
-                      <span className="text-gray-200 font-medium">{spec.value}</span>
-                    </li>
-                  ))}
-                </ul>
               </Accordion>
               
               <Accordion title="Shipping & Returns">
@@ -477,46 +474,97 @@ const ProductDetail = () => {
           <div>
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-extrabold flex items-center gap-3"><MessageCircle className="w-6 h-6 text-amber-500" /> Customer Reviews</h2>
-              <button className="text-sm text-amber-500 hover:text-amber-400 font-bold underline">Write a Review</button>
+              {user && !myReview && (
+                <button onClick={() => setShowReviewForm(!showReviewForm)} className="text-sm text-amber-500 hover:text-amber-400 font-bold underline">
+                  {showReviewForm ? 'Cancel' : 'Write a Review'}
+                </button>
+              )}
             </div>
-            
-            <div className="bg-[#0a0a0a] border border-[#1e1e1e] rounded-3xl p-6 flex items-center gap-6 mb-8">
-              <div className="text-center">
-                <span className="text-5xl font-extrabold text-amber-400 block mb-1">4.8</span>
-                <div className="flex text-amber-400 justify-center mb-1">
-                  <Star className="w-4 h-4 fill-current"/><Star className="w-4 h-4 fill-current"/><Star className="w-4 h-4 fill-current"/><Star className="w-4 h-4 fill-current"/><Star className="w-4 h-4 fill-current"/>
+
+            {reviews.length > 0 && (
+              <div className="bg-[#0a0a0a] border border-[#1e1e1e] rounded-3xl p-6 flex items-center gap-6 mb-8">
+                <div className="text-center">
+                  <span className="text-5xl font-extrabold text-amber-400 block mb-1">{avgRating.toFixed(1)}</span>
+                  <div className="flex text-amber-400 justify-center mb-1">
+                    {[...Array(5)].map((_, i) => <Star key={i} className={`w-4 h-4 ${i < Math.round(avgRating) ? 'fill-current' : 'text-gray-700'}`} />)}
+                  </div>
+                  <span className="text-xs text-gray-500">Based on {reviews.length} review{reviews.length !== 1 ? 's' : ''}</span>
                 </div>
-                <span className="text-xs text-gray-500">Based on 124 reviews</span>
+                <div className="flex-1 space-y-2">
+                  {[5, 4, 3, 2, 1].map((star) => {
+                    const count = reviews.filter((r) => r.rating === star).length;
+                    const pct = reviews.length > 0 ? (count / reviews.length) * 100 : 0;
+                    return (
+                      <div key={star} className="flex items-center gap-3 text-xs text-gray-400">
+                        <span className="w-3">{star}</span>
+                        <Star className="w-3 h-3 text-gray-600" />
+                        <div className="flex-1 h-2 bg-[#111] rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex-1 space-y-2">
-                {[5,4,3,2,1].map(star => (
-                  <div key={star} className="flex items-center gap-3 text-xs text-gray-400">
-                    <span className="w-3">{star}</span>
-                    <Star className="w-3 h-3 text-gray-600" />
-                    <div className="flex-1 h-2 bg-[#111] rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: star === 5 ? '80%' : star === 4 ? '15%' : '5%' }}></div>
+            )}
+
+            {showReviewForm && (
+              <div className="bg-[#0a0a0a] border border-[#1e1e1e] rounded-2xl p-5 mb-8">
+                <p className="text-sm font-bold text-gray-300 mb-2">Your Rating</p>
+                <div className="flex gap-1 mb-4">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button key={star} type="button" onClick={() => setNewRating(star)}>
+                      <Star className={`w-6 h-6 ${star <= newRating ? 'text-amber-400 fill-current' : 'text-gray-700'}`} />
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  rows={3}
+                  placeholder="Share your experience with this product..."
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 resize-none"
+                />
+                <button
+                  onClick={submitReview}
+                  disabled={submittingReview}
+                  className="mt-3 bg-amber-500 text-black font-bold px-6 py-2.5 rounded-xl hover:bg-amber-400 transition disabled:opacity-50"
+                >
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            )}
+
+            {reviews.length === 0 ? (
+              <p className="text-gray-500 text-sm">No reviews yet — be the first to share your experience.</p>
+            ) : (
+              <div className="space-y-6">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="border-b border-[#1e1e1e] pb-6">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <span className="font-bold text-gray-200 block mb-1">
+                          {rev.user.name}
+                          {rev.verifiedPurchase && (
+                            <span className="ml-2 text-[10px] font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full uppercase tracking-wide">Verified Purchase</span>
+                          )}
+                        </span>
+                        <div className="flex text-amber-400 gap-0.5">
+                          {[...Array(5)].map((_, i) => <Star key={i} className={`w-3 h-3 ${i < rev.rating ? 'fill-current' : 'text-gray-700'}`} />)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500">{new Date(rev.createdAt).toLocaleDateString('en-AE', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                        {rev.userId === user?.id && (
+                          <button onClick={deleteMyReview} className="text-xs text-red-500 hover:text-red-400 font-bold">Delete</button>
+                        )}
+                      </div>
                     </div>
+                    <p className="text-gray-400 text-sm leading-relaxed">{rev.comment}</p>
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="space-y-6">
-              {MOCK_REVIEWS.map(rev => (
-                <div key={rev.id} className="border-b border-[#1e1e1e] pb-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <span className="font-bold text-gray-200 block mb-1">{rev.user}</span>
-                      <div className="flex text-amber-400 gap-0.5">
-                        {[...Array(5)].map((_,i) => <Star key={i} className={`w-3 h-3 ${i < rev.rating ? 'fill-current' : 'text-gray-700'}`} />)}
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-500">{rev.date}</span>
-                  </div>
-                  <p className="text-gray-400 text-sm leading-relaxed">{rev.text}</p>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
 
           {/* Q&A */}

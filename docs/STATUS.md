@@ -14,19 +14,21 @@ model (not multi-vendor).
 
 **Storefront**
 - Home page with hero, categories, featured/trending products, collections, testimonials sections
-- Product listing (`/products`) with client-side search, category filter, price filter, sort
+- Product listing (`/products`) with client-side search, category filter, price filter, sort — also reads `?search=` from the URL so Navbar search results land here pre-filled
+- Real site-wide search: Navbar search icon (desktop) and mobile drawer search both do a live, debounced, server-backed autocomplete (`GET /api/products/list?search=`) — previously both were decorative with no handler at all
 - Category collection pages (`/collections/:category`)
-- Product detail page with image gallery, related products, bundle upsell
+- Product detail page with image gallery, related products, bundle upsell, real reviews (see below), and a real "Compatibility" section driven by `product.model` — no more fake color/size selectors or a spec sheet that claimed every product had "MagSafe: Built-in N52 Magnets"
 - Cart page, add/remove/update quantity
 - Checkout with saved-address reuse or new-address form
 - Order history page (`/orders`)
-- Cash-on-delivery order placement, end to end
+- Cash-on-delivery order placement, end to end, now sends an order-confirmation email (logged, see Infra) and a shipping-update email on every status change
 - Content is already themed for the pivot: categories are iPhone Cases, MagSafe, Watch Bands, Earbuds, etc, and `Product.model` field exists for device compatibility (e.g. "iPhone 17 Pro Max")
 
 **Auth**
 - Register/login/logout with bcrypt password hashing + JWT in httpOnly cookie
 - Session restore on page load (`/api/users/is-auth`)
 - Protected routes on the client (`ProtectedRoute` component)
+- Forgot-password / reset-password flow: single-use, sha256-hashed, 1-hour-expiry tokens on the `User` row; `POST /api/users/forgot-password` responds identically whether or not the email exists (no account enumeration). Client pages at `/forgot-password` and `/reset-password`.
 - Separate seller/admin login, gated by `SELLER_EMAIL`/`SELLER_PASSWORD` env vars (single hardcoded admin, not a real user role)
 - `JWT_SECRET` is required at startup (`server/src/configs/env.ts`) — the server refuses to boot instead of silently falling back to a guessable secret
 
@@ -46,6 +48,8 @@ model (not multi-vendor).
 
 **Customer account**
 - Multiple saved addresses: list, select at checkout, edit, delete — all ownership-checked server-side (a user can't read/edit/delete another user's address)
+- Product reviews & ratings: real `Review` model, one review per user per product, server-computed "Verified Purchase" badge (checks actual order history, not client-supplied), average rating + rating-distribution bars computed from real data, users can delete their own review. Replaces the old `MOCK_REVIEWS`/hardcoded "4.8 (124 reviews)" entirely.
+- Wishlist: real `Wishlist` model, a `/wishlist` page, Redux-tracked state so the heart icon shows filled/outline consistently across Products/ProductDetail/Navbar. This also fixed three previously-dead decorative heart buttons (`Products.tsx` list + grid view, `ProductDetail.tsx`) that had no `onClick` at all before this pass.
 
 **Security & hardening**
 - Every JSON-body endpoint validates input with `zod` (`server/src/validators/schemas.ts` + `validateBody` middleware) instead of scattered manual `if (!field)` checks; the two multipart product endpoints validate their JSON form field directly in the controller
@@ -60,6 +64,7 @@ model (not multi-vendor).
 - `.env.example` exists in both packages
 - CORS configured with an origin allowlist (not `*`)
 - Cookies set `httpOnly`, `secure` in production, `sameSite` adjusted per environment
+- Email abstraction (`server/src/configs/email.ts`, `sendEmail()`): no provider configured yet, so it logs the email via `pino` instead of sending it. Used by forgot-password, order confirmation, and order status updates — swapping in a real provider (Resend/SendGrid/SES) later is a one-file change since every feature calls the same function.
 
 ---
 
@@ -67,11 +72,11 @@ model (not multi-vendor).
 
 - **Card payment at checkout is a visual-only stub.** The UI has a Stripe-style card form, but it's `disabled`, nothing calls Stripe, and the place-order button is disabled whenever "card" is selected (`client/src/pages/Checkout.tsx`). `stripe` is in `server/package.json` but is never imported anywhere in `server/src`. Right now **cash-on-delivery is the only way to actually complete an order.**
 - **Existing seeded products are still priced as if they were ₹, not AED.** The 12 products in the DB have prices like `3700`, `6900` — clearly denominated in rupees, now displayed as literal AED (e.g. "AED 6,900" ≈ $1,880 for a phone case). This needs a manual re-price pass through the admin panel; it wasn't touched automatically since it's a business pricing decision, not a formatting bug.
-- **`Products.tsx` (public storefront) still filters/sorts/searches entirely client-side**, even though `GET /api/products/list` now supports `?page=&limit=&search=&category=&sort=` (used by the seller admin panel). This was a deliberate scoping decision, not an oversight — converting the public browsing UX to paginated loading is a real design change (infinite scroll vs. pages, per-filter loading states) that deserves its own pass. Fine at the current catalog size (~12 products); revisit once it grows.
+- **`Products.tsx` (public storefront) still filters/sorts/searches entirely client-side**, even though `GET /api/products/list` now supports `?page=&limit=&search=&category=&sort=` (used by the seller admin panel and the new Navbar search). This was a deliberate scoping decision, not an oversight — converting the public browsing UX to paginated loading is a real design change (infinite scroll vs. pages, per-filter loading states) that deserves its own pass. Fine at the current catalog size (~12 products); revisit once it grows.
 - **Cart model is a hack.** `User.cartItems` is `String[]` — quantity is represented by repeating the same product ID N times (`client/src/pages/Checkout.tsx` rebuilds counts by tallying duplicates). No cart line-item table, no per-item cart timestamps, no server-side stock check when adding to cart or placing an order.
 - **No inventory quantity tracking**, still just boolean `inStock`. Deliberately deferred out of the Phase 3 admin-panel work — doing it properly means a schema change plus a stock-decrement step in order placement, which belongs alongside the Phase 2 "stock re-check at order time" / DB-transaction work, not bolted onto the admin panel separately.
-- **Product detail page is heavily mocked**: colors, sizes, compatibility list, spec sheet, reviews, and FAQ on `ProductDetail.tsx` are all `MOCK_*` constants, not real data — none of these fields exist on the `Product` model, and there's no reviews table/endpoint. The reviews shown to customers right now are fake.
-- **Coupon/promo code field on Cart page is UI-only** — `couponCode` state exists, no backend coupon model or endpoint to apply it against.
+- **`ProductDetail.tsx`'s FAQ section is still generic static copy** (`MOCK_FAQ`) — left alone deliberately, it's not a false per-product claim like the removed color/size/spec mocks were, just boilerplate info.
+- **Coupon/promo code field on Cart page is UI-only, and staying that way** — `couponCode` state exists with no backend behind it. Confirmed descoped, not a gap.
 - **`Products.tsx` filter UI (`MOCK_FILTERS`) offers colors/brands/materials that don't exist on the Product model** — the code even has a comment acknowledging this. Filtering only actually works for category, price, and in-stock/search.
 - **Order total is still one opaque number.** `Order.amount` stores the final total only — subtotal/VAT/shipping aren't broken out in the DB, only computed and shown client-side before submission. Fine for now; revisit if order confirmation emails or admin reporting need the breakdown later.
 
@@ -85,12 +90,7 @@ model (not multi-vendor).
 - No Apple Pay / Google Pay
 
 **Commerce features**
-- No product reviews/ratings
-- No wishlist
-- No coupon/discount codes
 - No low-stock alerts for admin (would need inventory quantity tracking first — see above)
-- No email notifications (order confirmation, shipping update, password reset)
-- No forgot-password / reset-password flow
 - No CSV/bulk product import
 
 **Security & production hardening**
@@ -127,6 +127,12 @@ model (not multi-vendor).
 | Multiple saved addresses | Done | — |
 | Order status management | Done | — |
 | Admin dashboard stats | Done (basic) | — |
+| Product reviews & ratings | Done | — |
+| Wishlist | Done | — |
+| Site search | Done (server-backed autocomplete) | — |
+| Forgot-password flow | Done (email logged, not sent — no provider yet) | — |
+| Order confirmation/status emails | Done (email logged, not sent — no provider yet) | — |
+| Coupon codes | **Descoped** — not needed for this store | — |
 | Inventory quantity tracking | Missing — deferred to pair with Phase 2 stock-recheck work | Should-have |
 | Security hardening (rate limit, request validation, helmet, logging) | Done (zod, rate limiting, helmet, pino, password-leak fixes); CSRF/Sentry/DB-transaction still open | **Yes** — remaining pieces (CSRF, Sentry) |
 | Tests | None | Should-have before scaling team |

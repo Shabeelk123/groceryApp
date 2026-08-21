@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { setUser } from "../redux/userSlice";
 import axiosInstance from "../lib/axiosConfig";
+import { formatCurrency } from "../utils/commonUtils";
 import toast from "react-hot-toast";
 import { 
   Search, Heart, ShoppingBag, User, 
@@ -13,11 +14,38 @@ const Navbar = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.user.user);
+  const wishlist = useAppSelector((state) => state.user.wishlist);
   const cartCount = user?.cartItems?.length ?? 0;
+  const wishlistCount = wishlist.length;
   
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{ id: number; name: string; offerPrice: number; image: string[] }[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) { setSearchResults([]); return; }
+    setSearching(true);
+    const debounce = setTimeout(() => {
+      axiosInstance.get('/api/products/list', { params: { search: searchQuery.trim(), limit: 5, page: 1 } })
+        .then((res) => setSearchResults(res.data.products || []))
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(debounce);
+  }, [searchQuery]);
+
+  const runSearch = (query: string) => {
+    if (!query.trim()) return;
+    navigate(`/products?search=${encodeURIComponent(query.trim())}`);
+    setShowSearch(false);
+    setIsDrawerOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
 
   // Close drawer when window resizes to desktop
   useEffect(() => {
@@ -133,12 +161,66 @@ const Navbar = () => {
             
             {/* Desktop Only Icons */}
             <div className="hidden md:flex items-center gap-4 border-r border-[#2a2a2a] pr-5 mr-1">
-              <button className="text-gray-300 hover:text-amber-400 transition-colors hover:scale-110 active:scale-95 duration-200" aria-label="Search">
-                <Search className="w-[20px] h-[20px]" />
-              </button>
-              <button onClick={() => toast('Wishlist is coming soon')} className="text-gray-300 hover:text-amber-400 transition-colors hover:scale-110 active:scale-95 duration-200" aria-label="Wishlist">
+              <div className="relative">
+                <button
+                  onClick={() => setShowSearch(!showSearch)}
+                  className="text-gray-300 hover:text-amber-400 transition-colors hover:scale-110 active:scale-95 duration-200"
+                  aria-label="Search"
+                >
+                  <Search className="w-[20px] h-[20px]" />
+                </button>
+                {showSearch && (
+                  <div className="absolute top-full right-0 mt-4 w-80 bg-[#0f0f0f]/95 backdrop-blur-xl border border-[#2a2a2a] rounded-2xl shadow-2xl p-3 z-50">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') runSearch(searchQuery); }}
+                      placeholder="Search products..."
+                      className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl py-2.5 px-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50"
+                    />
+                    {searching && <p className="text-xs text-gray-500 px-2 pt-3">Searching...</p>}
+                    {!searching && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                      <p className="text-xs text-gray-500 px-2 pt-3">No products found</p>
+                    )}
+                    {searchResults.length > 0 && (
+                      <div className="mt-2 space-y-1 max-h-80 overflow-y-auto">
+                        {searchResults.map((p) => (
+                          <NavLink
+                            key={p.id}
+                            to={`/product/${p.id}`}
+                            onClick={() => { setShowSearch(false); setSearchQuery(''); setSearchResults([]); }}
+                            className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#1a1a1a] transition-colors"
+                          >
+                            <div className="w-10 h-10 bg-[#111] rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                              {p.image?.[0] ? <img src={p.image[0]} alt="" className="w-full h-full object-contain p-1" /> : <span className="text-lg">📱</span>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-gray-200 truncate">{p.name}</p>
+                              <p className="text-xs text-amber-400 font-bold">{formatCurrency(p.offerPrice)}</p>
+                            </div>
+                          </NavLink>
+                        ))}
+                        <button
+                          onClick={() => runSearch(searchQuery)}
+                          className="w-full text-center text-xs font-bold text-amber-500 hover:text-amber-400 py-2"
+                        >
+                          See all results
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <NavLink to="/wishlist" className="relative text-gray-300 hover:text-amber-400 transition-colors hover:scale-110 active:scale-95 duration-200" aria-label="Wishlist">
                 <Heart className="w-[20px] h-[20px]" />
-              </button>
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-amber-500 text-[#0a0a0a] text-[10px] font-extrabold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 border-2 border-[#0a0a0a]">
+                    {wishlistCount}
+                  </span>
+                )}
+              </NavLink>
             </div>
 
             {/* Cart - Always Visible */}
@@ -246,11 +328,31 @@ const Navbar = () => {
           {/* Search Bar Mobile */}
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search products..." 
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') runSearch(searchQuery); }}
+              placeholder="Search products..."
               className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl py-3 pl-11 pr-4 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 transition-colors"
             />
+            {searchResults.length > 0 && (
+              <div className="mt-2 bg-[#111] border border-[#2a2a2a] rounded-xl p-2 space-y-1 max-h-64 overflow-y-auto">
+                {searchResults.map((p) => (
+                  <NavLink
+                    key={p.id}
+                    to={`/product/${p.id}`}
+                    onClick={() => { setIsDrawerOpen(false); setSearchQuery(''); setSearchResults([]); }}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#1a1a1a] transition-colors"
+                  >
+                    <div className="w-9 h-9 bg-[#0a0a0a] rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                      {p.image?.[0] ? <img src={p.image[0]} alt="" className="w-full h-full object-contain p-1" /> : <span className="text-sm">📱</span>}
+                    </div>
+                    <p className="text-sm text-gray-200 truncate">{p.name}</p>
+                  </NavLink>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Nav Links */}
@@ -261,12 +363,9 @@ const Navbar = () => {
             <NavLink to="/products" className={mobileNavLinkStyle} onClick={() => setIsDrawerOpen(false)}>
               All Products
             </NavLink>
-            <button
-              className="flex items-center text-lg font-medium p-3 rounded-xl transition-all duration-300 text-gray-300 hover:bg-[#1a1a1a] hover:text-white text-left"
-              onClick={() => { setIsDrawerOpen(false); toast('Wishlist is coming soon'); }}
-            >
-              Wishlist
-            </button>
+            <NavLink to="/wishlist" className={mobileNavLinkStyle} onClick={() => setIsDrawerOpen(false)}>
+              Wishlist {wishlistCount > 0 && <span className="text-amber-400 ml-1">({wishlistCount})</span>}
+            </NavLink>
             
             <div className="h-px w-full bg-[#1e1e1e] my-2"></div>
             <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 mt-2">Categories</p>

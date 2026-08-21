@@ -4,6 +4,7 @@ import axiosInstance from '../lib/axiosConfig';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { updateCartItems } from '../redux/userSlice';
 import { formatCurrency } from '../utils/commonUtils';
+import { toggleWishlist } from '../utils/wishlistActions';
 import toast from 'react-hot-toast';
 import { 
   LayoutGrid, List as ListIcon, Filter, X, 
@@ -45,7 +46,7 @@ const Products = () => {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [selectedCategory, setSelectedCategory] = useState(
     CATEGORIES.find(c => c.toLowerCase().replace(' ', '-') === initialCategory) || 'all'
   );
@@ -62,14 +63,23 @@ const Products = () => {
 
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.user.user);
+  const wishlist = useAppSelector((state) => state.user.wishlist);
+
+  const handleToggleWishlist = (e: React.MouseEvent, productId: number) => {
+    e.preventDefault();
+    if (!user) { toast.error('Please login to save items'); return; }
+    toggleWishlist(productId, wishlist.includes(productId), dispatch);
+  };
 
   useEffect(() => {
-    // Update selected category when URL changes
+    // Update selected category and search term when URL changes
     const catParam = searchParams.get('category');
     if (catParam) {
       const match = CATEGORIES.find(c => c.toLowerCase().replace(' ', '-') === catParam);
       if (match) setSelectedCategory(match);
     }
+    const searchParam = searchParams.get('search');
+    if (searchParam) setSearchTerm(searchParam);
   }, [searchParams]);
 
   useEffect(() => {
@@ -384,8 +394,8 @@ const Products = () => {
                         <div className="p-5 flex-1 flex flex-col justify-center">
                           <div className="flex justify-between items-start mb-1">
                             <p className="text-amber-500/80 text-[11px] font-bold tracking-wider uppercase">{product.category}</p>
-                            <button className="text-gray-500 hover:text-amber-400 transition-colors">
-                              <Heart className="w-5 h-5" />
+                            <button onClick={(e) => handleToggleWishlist(e, product.id)} className={`transition-colors ${wishlist.includes(product.id) ? 'text-amber-400' : 'text-gray-500 hover:text-amber-400'}`}>
+                              <Heart className={`w-5 h-5 ${wishlist.includes(product.id) ? 'fill-current' : ''}`} />
                             </button>
                           </div>
                           <Link to={`/product/${product.id}`}>
@@ -418,9 +428,9 @@ const Products = () => {
                   // GRID VIEW CARD
                   return (
                     <div key={product.id} className="group bg-[#0f0f0f] border border-[#1e1e1e] rounded-3xl overflow-hidden hover:border-[#333] transition-all duration-300 flex flex-col relative">
-                      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                        <button className="w-9 h-9 rounded-full bg-[#111]/80 backdrop-blur-md border border-[#2a2a2a] flex items-center justify-center text-gray-300 hover:text-amber-400 hover:border-amber-400/50 transition-colors shadow-xl">
-                          <Heart className="w-4 h-4" />
+                      <div className={`absolute top-4 right-4 z-10 flex flex-col gap-2 transition-all duration-300 ${wishlist.includes(product.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0'}`}>
+                        <button onClick={(e) => handleToggleWishlist(e, product.id)} className={`w-9 h-9 rounded-full bg-[#111]/80 backdrop-blur-md border flex items-center justify-center transition-colors shadow-xl ${wishlist.includes(product.id) ? 'text-amber-400 border-amber-400/50' : 'text-gray-300 border-[#2a2a2a] hover:text-amber-400 hover:border-amber-400/50'}`}>
+                          <Heart className={`w-4 h-4 ${wishlist.includes(product.id) ? 'fill-current' : ''}`} />
                         </button>
                       </div>
 
