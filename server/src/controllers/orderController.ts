@@ -1,5 +1,6 @@
 import prisma from "../configs/db";
 import { Request, Response } from "express";
+import { VAT_RATE, getShippingFee } from "../utils/pricing";
 
 export const placeOrderCOD = async (req: Request, res: Response) => {
     try {
@@ -9,18 +10,24 @@ export const placeOrderCOD = async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
-        // Calculate total amount using for...of to correctly await each lookup
-        let totalAmount = 0;
+        const address = await prisma.address.findUnique({ where: { id: addressId } });
+        if (!address || address.userId !== userId) {
+            return res.status(400).json({ error: "Invalid address" });
+        }
+
+        // Calculate subtotal using for...of to correctly await each lookup
+        let subtotal = 0;
         for (const item of items) {
             const product = await prisma.product.findUnique({ where: { id: item.productId } });
             if (!product) {
                 return res.status(404).json({ error: `Product with id ${item.productId} not found` });
             }
-            totalAmount += product.offerPrice * item.quantity;
+            subtotal += product.offerPrice * item.quantity;
         }
 
-        // Add 2% tax
-        totalAmount += Math.round(totalAmount * 0.02);
+        const vat = subtotal * VAT_RATE;
+        const shippingFee = getShippingFee(subtotal, address.emirate);
+        const totalAmount = subtotal + vat + shippingFee;
 
         const order = await prisma.order.create({
             data: {

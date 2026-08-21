@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../store";
 import { setProducts } from "../../redux/sellerSlice";
 import axiosInstance from "../../lib/axiosConfig";
+import { formatCurrency } from "../../utils/commonUtils";
 import toast from "react-hot-toast";
 
 const ProductList = () => {
@@ -67,8 +68,8 @@ const ProductList = () => {
                                         <span className="font-medium text-gray-700 truncate max-w-[120px]">{product.name}</span>
                                     </td>
                                     <td className="px-4 py-3">{product.category}</td>
-                                    <td className="px-4 py-3 hidden md:table-cell text-gray-400 line-through">₹{product.price}</td>
-                                    <td className="px-4 py-3 hidden md:table-cell font-medium text-green-700">₹{product.offerPrice}</td>
+                                    <td className="px-4 py-3 hidden md:table-cell text-gray-400 line-through">{formatCurrency(product.price)}</td>
+                                    <td className="px-4 py-3 hidden md:table-cell font-medium text-green-700">{formatCurrency(product.offerPrice)}</td>
                                     <td className="px-4 py-3">
                                         <label className="relative inline-flex items-center cursor-pointer">
                                             <input

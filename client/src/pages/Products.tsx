@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import axiosInstance from '../lib/axiosConfig';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { updateCartItems } from '../redux/userSlice';
+import { formatCurrency } from '../utils/commonUtils';
 import toast from 'react-hot-toast';
 import { 
   LayoutGrid, List as ListIcon, Filter, X, 
@@ -54,7 +55,7 @@ const Products = () => {
   // New UI states
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
-  const [priceRange, setPriceRange] = useState<number>(15000);
+  const [priceRange, setPriceRange] = useState<number>(1000);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [inStockOnly, setInStockOnly] = useState(false);
@@ -163,18 +164,18 @@ const Products = () => {
         {/* Price */}
         <FilterSection title="Price Range">
           <div className="space-y-4">
-            <input 
-              type="range" 
-              min="0" 
-              max="15000" 
-              step="100"
-              value={priceRange} 
+            <input
+              type="range"
+              min="0"
+              max="1000"
+              step="10"
+              value={priceRange}
               onChange={(e) => setPriceRange(Number(e.target.value))}
               className="w-full accent-amber-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
             />
             <div className="flex items-center justify-between text-sm text-gray-400">
-              <span>₹0</span>
-              <span className="text-amber-400 font-bold bg-[#1a1a1a] px-3 py-1 rounded-lg">Up to ₹{priceRange}</span>
+              <span>{formatCurrency(0)}</span>
+              <span className="text-amber-400 font-bold bg-[#1a1a1a] px-3 py-1 rounded-lg">Up to {formatCurrency(priceRange)}</span>
             </div>
           </div>
         </FilterSection>
@@ -393,8 +394,8 @@ const Products = () => {
                           <p className="text-gray-400 text-sm line-clamp-2 mb-4 max-w-xl">{product.description || 'Premium mobile accessory crafted for ultimate protection and style.'}</p>
                           <div className="mt-auto flex flex-wrap items-center justify-between gap-4">
                             <div className="flex items-baseline gap-2.5">
-                              <span className="text-amber-400 font-extrabold text-xl">₹{product.offerPrice}</span>
-                              {discount > 0 && <span className="text-gray-500 line-through text-sm font-medium">₹{product.price}</span>}
+                              <span className="text-amber-400 font-extrabold text-xl">{formatCurrency(product.offerPrice)}</span>
+                              {discount > 0 && <span className="text-gray-500 line-through text-sm font-medium">{formatCurrency(product.price)}</span>}
                             </div>
                             <button
                               onClick={(e) => addToCart(product, e)}
@@ -444,8 +445,8 @@ const Products = () => {
                         
                         <div className="mt-auto flex items-center justify-between">
                           <div className="flex flex-col">
-                            {discount > 0 && <span className="text-gray-600 line-through text-[11px] font-medium leading-none mb-1">₹{product.price}</span>}
-                            <span className="text-amber-400 font-extrabold text-lg leading-none">₹{product.offerPrice}</span>
+                            {discount > 0 && <span className="text-gray-600 line-through text-[11px] font-medium leading-none mb-1">{formatCurrency(product.price)}</span>}
+                            <span className="text-amber-400 font-extrabold text-lg leading-none">{formatCurrency(product.offerPrice)}</span>
                           </div>
                           <button
                             onClick={(e) => addToCart(product, e)}

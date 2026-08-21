@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "../../store";
 import { setOrders } from "../../redux/sellerSlice";
 import axiosInstance from "../../lib/axiosConfig";
+import { formatCurrency } from "../../utils/commonUtils";
 import toast from "react-hot-toast";
 
 const Orders = () => {
@@ -54,11 +55,11 @@ const Orders = () => {
                             </div>
 
                             {/* Amount */}
-                            <p className="font-bold text-lg text-gray-800 flex-shrink-0">₹{order.amount}</p>
+                            <p className="font-bold text-lg text-gray-800 flex-shrink-0">{formatCurrency(order.amount)}</p>
 
                             {/* Meta */}
                             <div className="text-sm text-gray-500 flex-shrink-0 space-y-1">
-                                <p>📅 {new Date(order.createdAt).toLocaleDateString('en-IN')}</p>
+                                <p>📅 {new Date(order.createdAt).toLocaleDateString('en-AE')}</p>
                                 <p>💳 {order.paymentType}</p>
                                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
                                     order.isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'

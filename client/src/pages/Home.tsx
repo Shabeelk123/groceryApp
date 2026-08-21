@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../lib/axiosConfig';
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
+import { formatCurrency, FREE_SHIPPING_THRESHOLD } from '../utils/commonUtils';
 
 const CATEGORIES = [
   { name: 'iPhone Cases', emoji: '📱', desc: 'Slim, tough & stylish iPhone protection' },
@@ -74,7 +75,7 @@ const Home = () => {
       {/* ── Ticker bar ── */}
       <div className="bg-amber-500 text-black py-2.5 overflow-hidden">
         <div className="flex gap-16 animate-none whitespace-nowrap text-sm font-semibold tracking-wide px-6">
-          {['Free Shipping on orders above ₹499', 'Same-Day Dispatch', 'Premium Materials', 'Easy 7-Day Returns', 'Secure Checkout'].map((t, i) => (
+          {[`Free Shipping on orders above ${formatCurrency(FREE_SHIPPING_THRESHOLD)}`, 'Same-Day Dispatch in Dubai', 'Premium Materials', 'Easy 7-Day Returns', 'Secure Checkout'].map((t, i) => (
             <span key={i}>✦ {t}</span>
           ))}
         </div>
@@ -135,7 +136,7 @@ const Home = () => {
             {[
               { icon: '🛡️', title: 'Military-Grade Protection', desc: 'Every case is drop-tested and engineered to absorb shocks and keep your device pristine.' },
               { icon: '✨', title: 'Premium Materials', desc: 'Genuine leather, aramid fiber, tempered glass — we use only materials that last and look exceptional.' },
-              { icon: '🚀', title: 'Fast Delivery', desc: 'Same-day dispatch on orders placed before 3 PM. Free shipping across India above ₹499.' },
+              { icon: '🚀', title: 'Fast Delivery', desc: `Same-day dispatch on orders placed before 3 PM. Free shipping across the UAE above ${formatCurrency(FREE_SHIPPING_THRESHOLD)}.` },
             ].map((item) => (
               <div key={item.title} className="bg-[#161616] border border-[#2a2a2a] rounded-xl p-8 hover:border-amber-500/30 transition-colors duration-300">
                 <div className="w-14 h-14 rounded-full bg-amber-500/10 flex items-center justify-center mb-5 text-2xl">
@@ -180,7 +181,7 @@ const Home = () => {
             Find the Perfect Case Today
           </h2>
           <p className="text-black/70 text-lg mb-8">
-            Premium protection for iPhone, Samsung & more — shipped fast across India.
+            Premium protection for iPhone, Samsung & more — shipped fast across Dubai and the UAE.
           </p>
           <Link
             to="/register"
@@ -197,7 +198,7 @@ const Home = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <p className="text-2xl font-extrabold text-amber-400 mb-1">CaseHub</p>
-              <p className="text-gray-500 text-sm">Premium mobile accessories delivered fast across India.</p>
+              <p className="text-gray-500 text-sm">Premium mobile accessories delivered fast across Dubai and the UAE.</p>
             </div>
             <div className="flex gap-6 text-sm text-gray-400">
               <Link to="/products" className="hover:text-white transition">Products</Link>

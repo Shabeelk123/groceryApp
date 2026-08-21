@@ -3,8 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../lib/axiosConfig';
 import { useAppSelector, useAppDispatch } from '../hooks';
 import { updateCartItems } from '../redux/userSlice';
+import { formatCurrency, EMIRATES, VAT_RATE, getShippingFee } from '../utils/commonUtils';
 import toast from 'react-hot-toast';
-import { 
+import {
   MapPin, CreditCard, Banknote, ShieldCheck,
   CheckCircle2, Lock, ArrowLeft
 } from 'lucide-react';
@@ -26,8 +27,8 @@ interface Address {
   lastName: string;
   street: string;
   city: string;
-  state: string;
-  zipCode: string;
+  emirate: string;
+  poBox: string;
   country: string;
   phone: string;
 }
@@ -45,7 +46,7 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'stripe'>('cod');
 
   const [addressForm, setAddressForm] = useState<Address>({
-    firstName: '', lastName: '', street: '', city: '', state: '', zipCode: '', country: '', phone: '',
+    firstName: '', lastName: '', street: '', city: '', emirate: EMIRATES[0], poBox: '', country: 'United Arab Emirates', phone: '',
   });
 
   useEffect(() => {
@@ -83,12 +84,13 @@ const Checkout = () => {
     }, []);
   })();
 
+  const activeEmirate = (useNewAddress || !savedAddress) ? addressForm.emirate : savedAddress.emirate;
   const subtotal = cartItems.reduce((s, i) => s + i.offerPrice * i.quantity, 0);
-  const tax = subtotal * 0.02;
-  const deliveryFee = subtotal > 499 ? 0 : 49;
+  const tax = subtotal * VAT_RATE;
+  const deliveryFee = getShippingFee(subtotal, activeEmirate);
   const total = subtotal + tax + deliveryFee;
 
-  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setAddressForm({ ...addressForm, [e.target.name]: e.target.value });
   };
 
@@ -108,15 +110,15 @@ const Checkout = () => {
     let addressId: number | undefined = savedAddress?.id;
 
     if (useNewAddress || !addressId) {
-      const { firstName, lastName, street, city, state, zipCode, country, phone } = addressForm;
-      if (!firstName || !lastName || !street || !city || !state || !zipCode || !country || !phone) {
+      const { firstName, lastName, street, city, emirate, country, phone } = addressForm;
+      if (!firstName || !lastName || !street || !city || !emirate || !country || !phone) {
         toast.error('Please fill in all address fields');
         return;
       }
       try {
         const addrRes = await axiosInstance.post('/api/address/add', {
           userId: user.id,
-          address: { ...addressForm, zipCode: Number(zipCode) },
+          address: addressForm,
         });
         addressId = addrRes.data.addresses.id;
         setSavedAddress(addrRes.data.addresses);
@@ -215,7 +217,7 @@ const Checkout = () => {
                       <p className="font-bold text-gray-200 text-lg mb-1">{savedAddress.firstName} {savedAddress.lastName}</p>
                       <p className="text-gray-400 text-sm leading-relaxed mb-2">
                         {savedAddress.street}<br/>
-                        {savedAddress.city}, {savedAddress.state} {savedAddress.zipCode}<br/>
+                        {savedAddress.city}, {savedAddress.emirate}{savedAddress.poBox ? ` — PO Box ${savedAddress.poBox}` : ''}<br/>
                         {savedAddress.country}
                       </p>
                       <p className="text-gray-500 text-sm flex items-center gap-2">
@@ -227,19 +229,32 @@ const Checkout = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {['firstName', 'lastName', 'phone', 'street', 'city', 'state', 'zipCode', 'country'].map((field) => (
+                  {['firstName', 'lastName', 'phone', 'street', 'city', 'emirate', 'poBox', 'country'].map((field) => (
                     <div key={field} className={field === 'street' ? 'md:col-span-2' : ''}>
                       <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                        {field.replace(/([A-Z])/g, ' $1')}
+                        {field.replace(/([A-Z])/g, ' $1')}{field === 'poBox' && <span className="normal-case font-normal text-gray-600"> (optional)</span>}
                       </label>
-                      <input
-                        type={field === 'zipCode' ? 'number' : 'text'}
-                        name={field}
-                        value={(addressForm as any)[field]}
-                        onChange={handleAddressChange}
-                        className="w-full bg-[#111] border border-[#2a2a2a] text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 focus:bg-[#151515] transition-all"
-                        placeholder={`Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
-                      />
+                      {field === 'emirate' ? (
+                        <select
+                          name={field}
+                          value={addressForm.emirate}
+                          onChange={handleAddressChange}
+                          className="w-full bg-[#111] border border-[#2a2a2a] text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 focus:bg-[#151515] transition-all"
+                        >
+                          {EMIRATES.map((emirate) => (
+                            <option key={emirate} value={emirate}>{emirate}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          name={field}
+                          value={(addressForm as any)[field]}
+                          onChange={handleAddressChange}
+                          className="w-full bg-[#111] border border-[#2a2a2a] text-white px-4 py-3 rounded-xl text-sm focus:outline-none focus:border-amber-500/50 focus:bg-[#151515] transition-all"
+                          placeholder={field === 'poBox' ? 'PO Box / Makani number' : `Enter ${field.replace(/([A-Z])/g, ' $1').toLowerCase()}`}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -336,7 +351,7 @@ const Checkout = () => {
                       <p className="text-gray-500 text-xs mt-1">Qty: {item.quantity}</p>
                     </div>
                     <div className="flex items-center">
-                      <p className="font-extrabold text-amber-400 text-sm">₹{(item.offerPrice * item.quantity).toFixed(2)}</p>
+                      <p className="font-extrabold text-amber-400 text-sm">{formatCurrency(item.offerPrice * item.quantity)}</p>
                     </div>
                   </div>
                 ))}
@@ -346,23 +361,23 @@ const Checkout = () => {
               <div className="space-y-4 text-sm mb-6 border-b border-[#1e1e1e] pb-6">
                 <div className="flex justify-between text-gray-400 font-medium">
                   <span>Subtotal</span>
-                  <span className="text-white font-bold">₹{subtotal.toFixed(2)}</span>
+                  <span className="text-white font-bold">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-400 font-medium">
-                  <span>GST (2%)</span>
-                  <span className="text-white font-bold">₹{tax.toFixed(2)}</span>
+                  <span>VAT (5%)</span>
+                  <span className="text-white font-bold">{formatCurrency(tax)}</span>
                 </div>
                 <div className="flex justify-between text-gray-400 font-medium">
-                  <span>Delivery</span>
+                  <span>Delivery {activeEmirate && `(${activeEmirate})`}</span>
                   <span className={deliveryFee === 0 ? 'text-green-400 font-bold' : 'text-white font-bold'}>
-                    {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
+                    {deliveryFee === 0 ? 'FREE' : formatCurrency(deliveryFee)}
                   </span>
                 </div>
               </div>
 
               <div className="flex justify-between items-end mb-8">
                 <span className="text-gray-300 font-bold uppercase tracking-wider text-sm">Total to Pay</span>
-                <span className="text-3xl font-extrabold text-amber-400">₹{total.toFixed(2)}</span>
+                <span className="text-3xl font-extrabold text-amber-400">{formatCurrency(total)}</span>
               </div>
 
               <button

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axiosInstance from '../lib/axiosConfig';
 import { useAppSelector } from '../hooks';
 import { useNavigate, Link } from 'react-router-dom';
+import { formatCurrency } from '../utils/commonUtils';
 import toast from 'react-hot-toast';
 import { 
   Package, ChevronDown, CheckCircle2, Clock, 
@@ -162,7 +163,7 @@ const UserOrders = () => {
                     <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center border-t border-[#1e1e1e] md:border-t-0 pt-4 md:pt-0 gap-4 md:gap-2">
                       <div className="text-left md:text-right">
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Amount</p>
-                        <p className="font-extrabold text-2xl text-white">₹{order.amount.toFixed(2)}</p>
+                        <p className="font-extrabold text-2xl text-white">{formatCurrency(order.amount)}</p>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${order.isPaid ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}`}>
@@ -277,8 +278,8 @@ const UserOrders = () => {
                                 <p className="text-gray-500 text-xs mt-1">Qty: {item.quantity}</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-extrabold text-amber-400 text-sm">₹{(item.price * item.quantity).toFixed(2)}</p>
-                                {item.quantity > 1 && <p className="text-gray-600 text-[10px]">₹{item.price} each</p>}
+                                <p className="font-extrabold text-amber-400 text-sm">{formatCurrency(item.price * item.quantity)}</p>
+                                {item.quantity > 1 && <p className="text-gray-600 text-[10px]">{formatCurrency(item.price)} each</p>}
                               </div>
                             </div>
                           ))}

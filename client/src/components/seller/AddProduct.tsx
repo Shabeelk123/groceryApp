@@ -194,13 +194,13 @@ const AddProduct = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">MRP (₹) *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">MRP (AED) *</label>
             <input type="number" name="price" value={formData.price} onChange={handleChange} min={0} required
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               placeholder="0" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Offer Price (₹) *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Offer Price (AED) *</label>
             <input type="number" name="offerPrice" value={formData.offerPrice} onChange={handleChange} min={0} required
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               placeholder="0" />

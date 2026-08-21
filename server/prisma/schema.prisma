@@ -48,9 +48,10 @@ model Address {
     lastName  String
     street    String
     city      String
-    state     String
-    zipCode   Int
-    country   String
+    emirate   String   // Dubai, Abu Dhabi, Sharjah, etc. — fixed list, see EMIRATES in client
+    poBox     String?  // PO Box / Makani number — UAE addresses don't use postal codes
+    zipCode   Int?     // optional, kept for non-UAE addresses
+    country   String   @default("United Arab Emirates")
     phone     String
     orders    Order[]
     createdAt DateTime @default(now())

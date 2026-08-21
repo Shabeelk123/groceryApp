@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../lib/axiosConfig';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { updateCartItems } from '../redux/userSlice';
+import { formatCurrency } from '../utils/commonUtils';
 import toast from 'react-hot-toast';
 
 interface Product {
@@ -264,9 +265,9 @@ const CollectionPage = () => {
                       )}
                       <h3 className="text-sm font-semibold leading-tight mb-1 line-clamp-2">{product.name}</h3>
                       <div className="flex items-baseline gap-2 mt-2">
-                        <span className="text-amber-400 font-bold">₹{product.offerPrice.toLocaleString('en-IN')}</span>
+                        <span className="text-amber-400 font-bold">{formatCurrency(product.offerPrice)}</span>
                         {discount > 0 && (
-                          <span className="text-gray-600 line-through text-xs">₹{product.price.toLocaleString('en-IN')}</span>
+                          <span className="text-gray-600 line-through text-xs">{formatCurrency(product.price)}</span>
                         )}
                       </div>
                     </div>

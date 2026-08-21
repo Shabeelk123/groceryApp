@@ -15,14 +15,15 @@ instead of a one-time snapshot. Update [STATUS.md](STATUS.md) alongside it.
 
 Bugs, not features. Cheap to fix, currently undermining everything else.
 
-- [ ] Fix session-restore route mismatch: `App.tsx` calls `/api/users/auth`, real route is `/api/users/is-auth` — pick one and align both sides
-- [ ] Fix `sellerLogin` to return 401 on bad credentials instead of hanging
-- [ ] Fix or remove the Navbar wishlist link (`\wishlist` typo → dead route)
-- [ ] Reorder `productRoute.ts` middleware: `authSeller` before `upload.array(...)`
-- [ ] Add file-type allowlist (jpeg/png/webp) and size limit to `server/src/configs/multer.ts`
-- [ ] Remove the hardcoded `"secret"` JWT fallback in all 4 places (`userController.ts`, `sellerController.ts`, `authUser.ts`, `authSeller.ts`) — throw on startup if `JWT_SECRET` is missing instead
-- [ ] Add `.env.example` to both `client/` and `server/` (var names only, no real values)
-- [ ] Delete leftover grocery-era images from `server/public/uploads/`
+- [x] Fix session-restore route mismatch: `App.tsx` calls `/api/users/auth`, real route is `/api/users/is-auth` — pick one and align both sides
+- [x] Fix `sellerLogin` to return 401 on bad credentials instead of hanging
+- [x] Fix or remove the Navbar wishlist link (`\wishlist` typo → dead route) — now shows a "coming soon" toast instead of navigating
+- [x] Reorder `productRoute.ts` middleware: `authSeller` before `upload.array(...)`
+- [x] Add file-type allowlist (jpeg/png/webp) and size limit to `server/src/configs/multer.ts`
+- [x] Remove the hardcoded `"secret"` JWT fallback in all places — `server/src/configs/env.ts` now throws on startup if `JWT_SECRET` is missing (also required reordering `dotenv.config()` above the route imports in `server.ts`, since CommonJS `require()` runs in file order)
+- [x] Add `.env.example` to both `client/` and `server/` (var names only, no real values)
+- [x] Delete leftover grocery-era images from `server/public/uploads/`
+- [x] *(found while fixing the above)* Fixed a `tsc -b` build failure in `Home.tsx` plus unused-import errors — `npm run build` was broken before this
 
 ---
 
@@ -31,12 +32,15 @@ Bugs, not features. Cheap to fix, currently undermining everything else.
 This is the actual pivot the storefront needs — content is already themed for
 phone accessories, but money, tax, and shipping logic still assume India.
 
-- [ ] Replace every hardcoded `₹` with AED. Fastest correct path: make `formatCurrency()` (`client/src/utils/commonUtils.ts`) the *only* place currency is rendered, default it to `AED` (or `د.إ` if you want the Arabic symbol), and replace every literal `₹{...}` across `ProductDetail.tsx`, `Cart.tsx`, `Checkout.tsx`, `Products.tsx`, `Navbar.tsx`, `UserOrders.tsx`, seller `Orders.tsx` with `formatCurrency(...)` calls
-- [ ] Update `VITE_CURRENCY` in `client/.env` (and `.env.example`) to `AED`
-- [ ] Replace the fake flat "2% tax" in `orderController.ts` with real **UAE VAT at 5%**, applied and itemized clearly (subtotal / VAT / shipping / total) on both checkout UI and order confirmation
-- [ ] Rework the `Address` model for UAE addressing: replace/relabel `state` → `emirate` (Dubai, Abu Dhabi, Sharjah, etc. — a fixed dropdown, not free text), make `zipCode` optional (UAE has no reliable postal code system), consider adding an optional PO Box / Makani number field
-- [ ] Add Emirate-based shipping rates/zones (e.g. free/flat delivery within Dubai, small surcharge for other Emirates)
-- [ ] Decide and document the shipping SLA copy (currently generic "3-5 business days" placeholder text in `ProductDetail.tsx`)
+- [x] Replace every hardcoded `₹` with AED — `formatCurrency()` (`client/src/utils/commonUtils.ts`) is now the only place currency is rendered, defaults to `VITE_CURRENCY`/`AED`. All literal `₹{...}` across `ProductDetail.tsx`, `Cart.tsx`, `Checkout.tsx`, `Products.tsx`, `CollectionPage.tsx`, `UserOrders.tsx`, `Home.tsx`, seller `AddProduct.tsx`/`ProductList.tsx`/`Orders.tsx` replaced with `formatCurrency(...)` calls; also removed leftover "India"/`en-IN` copy and locale calls
+- [x] Update `VITE_CURRENCY` in `client/.env` (and `.env.example`) to `AED`
+- [x] Replace the fake flat "2% tax" in `orderController.ts` with real **UAE VAT at 5%** (`server/src/utils/pricing.ts`), itemized as subtotal / VAT / shipping / total on the checkout UI. *(Order model still stores a single `amount` total, not a broken-out record — itemization is client-side only for now; see Phase 6/schema note below if that needs to change.)*
+- [x] Reworked the `Address` model for UAE addressing via a real Prisma migration (`state`→`emirate` rename preserving existing data, `zipCode` now optional, added optional `poBox`/Makani field, `country` defaults to "United Arab Emirates"). Checkout form now renders `emirate` as a fixed 7-Emirate dropdown instead of free text.
+- [x] Added Emirate-based shipping: free above `AED 200` subtotal, flat `AED 15` within Dubai, `AED 25` for other Emirates (`getShippingFee()`, duplicated by hand in `client/src/utils/commonUtils.ts` and `server/src/utils/pricing.ts` — no shared package, keep both in sync)
+- [x] Updated shipping/delivery copy across `Home.tsx` and `ProductDetail.tsx` to Dubai/UAE-specific SLAs instead of the generic placeholder text
+- [x] *(found while fixing the above)* `placeOrderCOD` now verifies the address belongs to the requesting user before using it — it previously trusted any `addressId` from the request body; and it now actually includes the delivery fee in the stored order total, which it silently ignored before
+
+**⚠️ Action needed — not something to auto-fix:** the ~15 products already seeded in the DB have prices like `3700`, `6900`, `2200` — clearly priced in ₹, and now displayed as literal AED (e.g. "AED 6,900" for a phone case, which is roughly $1,880). Re-price the existing catalog through the seller admin panel (or a one-off script) before this goes anywhere near real customers. This wasn't touched automatically since it's a real business pricing decision, not a currency-formatting bug.
 
 ---
 

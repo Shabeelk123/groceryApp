@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import axiosInstance from '../lib/axiosConfig';
 import { useAppDispatch, useAppSelector } from '../hooks';
 import { updateCartItems } from '../redux/userSlice';
+import { formatCurrency, FREE_SHIPPING_THRESHOLD, DUBAI_SHIPPING_FEE, OTHER_EMIRATES_SHIPPING_FEE } from '../utils/commonUtils';
 import toast from 'react-hot-toast';
 import { 
   Star, Truck, ShieldCheck, ChevronRight, ChevronDown,
@@ -242,8 +243,8 @@ const ProductDetail = () => {
               </div>
 
               <div className="flex items-end gap-4 mb-8">
-                <span className="text-5xl font-extrabold text-amber-400">₹{product.offerPrice}</span>
-                {discount > 0 && <span className="text-2xl text-gray-600 line-through mb-1 font-semibold">₹{product.price}</span>}
+                <span className="text-5xl font-extrabold text-amber-400">{formatCurrency(product.offerPrice)}</span>
+                {discount > 0 && <span className="text-2xl text-gray-600 line-through mb-1 font-semibold">{formatCurrency(product.price)}</span>}
               </div>
             </div>
 
@@ -336,7 +337,7 @@ const ProductDetail = () => {
                   }`}
                 >
                   <ShoppingBag className="w-5 h-5" />
-                  {adding ? 'Adding...' : product.inStock ? `Add to Cart — ₹${(product.offerPrice * quantity).toFixed(2)}` : 'Out of Stock'}
+                  {adding ? 'Adding...' : product.inStock ? `Add to Cart — ${formatCurrency(product.offerPrice * quantity)}` : 'Out of Stock'}
                 </button>
               </div>
             </div>
@@ -349,7 +350,7 @@ const ProductDetail = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-gray-200">Free Shipping</h4>
-                  <p className="text-xs text-gray-500">Orders over ₹999</p>
+                  <p className="text-xs text-gray-500">Orders over {formatCurrency(FREE_SHIPPING_THRESHOLD)} within the UAE</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 bg-[#0a0a0a] border border-[#1e1e1e] p-4 rounded-2xl">
@@ -381,8 +382,9 @@ const ProductDetail = () => {
               </Accordion>
               
               <Accordion title="Shipping & Returns">
-                <p className="mb-2"><strong>Standard Shipping:</strong> 3-5 business days. Free for orders over ₹999.</p>
-                <p className="mb-2"><strong>Express Shipping:</strong> 1-2 business days. Available at checkout for ₹150.</p>
+                <p className="mb-2"><strong>Dubai:</strong> 1-2 business days, {formatCurrency(DUBAI_SHIPPING_FEE)} flat rate.</p>
+                <p className="mb-2"><strong>Other Emirates:</strong> 2-4 business days, {formatCurrency(OTHER_EMIRATES_SHIPPING_FEE)} flat rate.</p>
+                <p className="mb-2">Free shipping on orders over {formatCurrency(FREE_SHIPPING_THRESHOLD)}, UAE-wide.</p>
                 <p><strong>Returns:</strong> We accept returns within 7 days of delivery. Items must be unused and in original packaging. <Link to="#" className="text-amber-500 hover:underline">Read full policy</Link>.</p>
               </Accordion>
             </div>
@@ -406,7 +408,7 @@ const ProductDetail = () => {
                     {product.image?.[0] ? <img src={product.image[0]} className="h-full object-contain" alt="" /> : <span className="text-4xl">📱</span>}
                   </div>
                   <h4 className="text-sm font-bold truncate text-center">{product.name}</h4>
-                  <p className="text-amber-500 font-bold text-center">₹{product.offerPrice}</p>
+                  <p className="text-amber-500 font-bold text-center">{formatCurrency(product.offerPrice)}</p>
                 </div>
                 
                 <span className="text-3xl text-gray-600 font-light">+</span>
@@ -418,7 +420,7 @@ const ProductDetail = () => {
                       {relatedProducts[0].image?.[0] ? <img src={relatedProducts[0].image[0]} className="h-full object-contain" alt="" /> : <span className="text-4xl">🔌</span>}
                     </div>
                     <h4 className="text-sm font-bold truncate text-center text-gray-300">{relatedProducts[0].name}</h4>
-                    <p className="text-amber-500 font-bold text-center">₹{relatedProducts[0].offerPrice}</p>
+                    <p className="text-amber-500 font-bold text-center">{formatCurrency(relatedProducts[0].offerPrice)}</p>
                   </Link>
                 )}
               </div>
@@ -428,8 +430,8 @@ const ProductDetail = () => {
                 <div className="w-full md:w-auto bg-[#111] border border-[#2a2a2a] p-6 rounded-2xl flex flex-col justify-center items-center md:items-start">
                   <p className="text-gray-400 text-sm mb-1">Bundle Total:</p>
                   <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-3xl font-extrabold text-amber-400">₹{product.offerPrice + relatedProducts[0].offerPrice}</span>
-                    <span className="text-sm text-gray-500 line-through">₹{product.price + relatedProducts[0].price}</span>
+                    <span className="text-3xl font-extrabold text-amber-400">{formatCurrency(product.offerPrice + relatedProducts[0].offerPrice)}</span>
+                    <span className="text-sm text-gray-500 line-through">{formatCurrency(product.price + relatedProducts[0].price)}</span>
                   </div>
                   <button className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-3 px-8 rounded-xl transition-colors shadow-[0_0_15px_rgba(245,158,11,0.2)]">
                     Add Both to Cart
@@ -458,8 +460,8 @@ const ProductDetail = () => {
                     <p className="text-gray-500 text-[10px] font-bold uppercase">{rp.category}</p>
                     <Link to={`/product/${rp.id}`}><h3 className="font-bold text-gray-100 group-hover:text-amber-400 transition-colors text-sm truncate">{rp.name}</h3></Link>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className="text-amber-400 font-extrabold">₹{rp.offerPrice}</span>
-                      {rpDiscount > 0 && <span className="text-gray-600 line-through text-xs">₹{rp.price}</span>}
+                      <span className="text-amber-400 font-extrabold">{formatCurrency(rp.offerPrice)}</span>
+                      {rpDiscount > 0 && <span className="text-gray-600 line-through text-xs">{formatCurrency(rp.price)}</span>}
                     </div>
                   </div>
                 </div>
@@ -550,7 +552,7 @@ const ProductDetail = () => {
             </div>
             <div>
               <h4 className="font-bold text-sm truncate max-w-xs">{product.name}</h4>
-              <p className="text-amber-400 font-bold text-xs">₹{product.offerPrice}</p>
+              <p className="text-amber-400 font-bold text-xs">{formatCurrency(product.offerPrice)}</p>
             </div>
           </div>
           

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../lib/axiosConfig';
 import { useAppSelector, useAppDispatch } from '../hooks';
 import { updateCartItems } from '../redux/userSlice';
+import { formatCurrency, VAT_RATE, FREE_SHIPPING_THRESHOLD, getShippingFee } from '../utils/commonUtils';
 import toast from 'react-hot-toast';
 import { 
   Trash2, Plus, Minus, Tag, ShieldCheck, 
@@ -81,8 +82,9 @@ const Cart = () => {
   };
 
   const subtotal = cartItems.reduce((s, i) => s + i.offerPrice * i.quantity, 0);
-  const tax = subtotal * 0.02;
-  const delivery = subtotal > 499 ? 0 : 49;
+  const tax = subtotal * VAT_RATE;
+  // Actual delivery fee depends on the emirate chosen at checkout — this is a Dubai-rate estimate
+  const delivery = getShippingFee(subtotal, 'Dubai');
   const total = subtotal + tax + delivery;
 
   if (!user) return (
@@ -166,8 +168,8 @@ const Cart = () => {
                   </Link>
                   
                   <div className="flex items-baseline gap-2 mb-4">
-                    <p className="text-xl font-extrabold text-amber-400">₹{item.offerPrice}</p>
-                    {item.price > item.offerPrice && <p className="text-sm text-gray-600 line-through font-medium">₹{item.price}</p>}
+                    <p className="text-xl font-extrabold text-amber-400">{formatCurrency(item.offerPrice)}</p>
+                    {item.price > item.offerPrice && <p className="text-sm text-gray-600 line-through font-medium">{formatCurrency(item.price)}</p>}
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -188,7 +190,7 @@ const Cart = () => {
                       </button>
                     </div>
 
-                    <p className="font-bold text-lg sm:hidden">₹{(item.offerPrice * item.quantity).toFixed(2)}</p>
+                    <p className="font-bold text-lg sm:hidden">{formatCurrency(item.offerPrice * item.quantity)}</p>
                   </div>
                 </div>
 
@@ -203,7 +205,7 @@ const Cart = () => {
                   </button>
                   <div className="text-right">
                     <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total</p>
-                    <p className="font-extrabold text-xl text-white">₹{(item.offerPrice * item.quantity).toFixed(2)}</p>
+                    <p className="font-extrabold text-xl text-white">{formatCurrency(item.offerPrice * item.quantity)}</p>
                   </div>
                 </div>
               </div>
@@ -243,29 +245,29 @@ const Cart = () => {
               <div className="space-y-4 text-sm mb-6 border-b border-[#1e1e1e] pb-6">
                 <div className="flex justify-between text-gray-400 font-medium">
                   <span>Subtotal</span>
-                  <span className="text-white font-bold">₹{subtotal.toFixed(2)}</span>
+                  <span className="text-white font-bold">{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-400 font-medium">
-                  <span>GST (2%)</span>
-                  <span className="text-white font-bold">₹{tax.toFixed(2)}</span>
+                  <span>VAT (5%)</span>
+                  <span className="text-white font-bold">{formatCurrency(tax)}</span>
                 </div>
                 <div className="flex justify-between text-gray-400 font-medium">
-                  <span>Delivery</span>
+                  <span>Delivery (Dubai est.)</span>
                   <span className={delivery === 0 ? 'text-green-400 font-bold' : 'text-white font-bold'}>
-                    {delivery === 0 ? 'FREE' : `₹${delivery}`}
+                    {delivery === 0 ? 'FREE' : formatCurrency(delivery)}
                   </span>
                 </div>
-                {subtotal < 499 && (
+                {subtotal < FREE_SHIPPING_THRESHOLD && (
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-2">
                     <Truck className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-400">Add <span className="font-bold">₹{(499 - subtotal).toFixed(0)}</span> more to your order for free delivery!</p>
+                    <p className="text-xs text-amber-400">Add <span className="font-bold">{formatCurrency(FREE_SHIPPING_THRESHOLD - subtotal)}</span> more to your order for free delivery!</p>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-between items-end mb-8">
                 <span className="text-gray-300 font-bold uppercase tracking-wider text-sm">Total</span>
-                <span className="text-3xl font-extrabold text-amber-400">₹{total.toFixed(2)}</span>
+                <span className="text-3xl font-extrabold text-amber-400">{formatCurrency(total)}</span>
               </div>
 
               <button
