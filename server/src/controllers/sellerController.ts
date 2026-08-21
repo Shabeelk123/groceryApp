@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../configs/env";
+import logger from "../configs/logger";
 interface JwtPayload {
     email: string;
     iat?: number;
@@ -10,9 +11,6 @@ interface JwtPayload {
 export const sellerLogin = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: "Missing required fields" });
-        }
         if(password===process.env.SELLER_PASSWORD && email===process.env.SELLER_EMAIL){
             const token = jwt.sign({ email }, JWT_SECRET, {
                 expiresIn: "2h",
@@ -27,7 +25,7 @@ export const sellerLogin = async (req: Request, res: Response) => {
         }
         return res.status(401).json({ error: "Invalid email or password" });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to login seller" });
     }
 };
@@ -46,7 +44,7 @@ export const sellerAuth = (req: Request, res: Response) => {
             return res.status(401).json({success: false, error: "Unauthorized - Invalid token payload" });
         }
     } catch (error) {
-        console.error("JWT verification error:", error);
+        logger.error({ error }, "JWT verification error");
         return res.status(401).json({ error: "Unauthorized - Invalid token" });
     }
 };
@@ -57,7 +55,7 @@ export const sellerLogout = (req: Request, res: Response) => {
         res.clearCookie("sellerToken");
         return res.status(200).json({ message: "Seller logged out successfully" });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to logout seller" });
     }
 };

@@ -79,13 +79,17 @@ enough to run a real store without touching the database by hand.
 ## Phase 4 — Security & hardening
 
 - [x] *(found and fixed during Phase 3 testing)* `registerUser`/`loginUser` were echoing the bcrypt password hash back in the response body — now stripped before the response is sent
-- [ ] Add request validation with `zod` (already TypeScript-native, pairs well with Prisma) on every controller that takes user input — replaces the current scattered manual `if (!field)` checks
-- [ ] Add `express-rate-limit` on `/api/users/login`, `/api/users/register`, `/api/sellers/login` at minimum
-- [ ] Add `helmet` to `server.ts`
-- [ ] Add structured logging (`pino` is a good lightweight fit) to replace bare `console.error`
-- [ ] Add error tracking (Sentry free tier is enough to start) on both client and server
-- [ ] Confirm CORS allowlist supports your real production domain(s), not just `FRONTEND_URL` + localhost
-- [ ] Rotate the Cloudinary and DB credentials currently sitting in `server/.env` before this project is shared with anyone else or deployed anywhere — they're gitignored correctly, but treat any credential that's been sitting in a local `.env` for a while as due for rotation before go-live
+- [x] *(found and fixed during Phase 4 testing)* `updateCart` had the same leak — `prisma.user.update()` returned the full `User` row including `password`. Now scoped with `select: { cartItems: true }`, matching what the client actually reads from the response.
+- [x] Add request validation with `zod` on every controller that takes user input — `server/src/validators/schemas.ts` + a `validateBody` middleware (`server/src/middlewares/validate.ts`) applied to every JSON-body route; the two multipart product endpoints (`addProduct`/`updateProduct`) validate the parsed `productData` JSON directly in the controller since it arrives as a form field, not the request body. Replaces the old scattered manual `if (!field)` checks everywhere.
+- [x] Add `express-rate-limit` on `/api/users/login`, `/api/users/register`, `/api/sellers/login` — each gets its **own** limiter instance (`createAuthRateLimiter()`, 10 req/15min per IP) so brute-forcing one endpoint doesn't also lock a user out of the others.
+- [x] Add `helmet` to `server.ts`
+- [x] Add structured logging with `pino` + `pino-http` — replaces every `console.error`/`console.log` in the server, and every request is now logged (method/path/status/duration) via `pino-http` middleware.
+- [x] Ran `npm audit fix` (non-breaking) in `server/`, resolving 12 of 15 pre-existing transitive-dependency vulnerabilities (multer DoS bugs, `jws` HMAC issue, `qs`/`path-to-regexp`/`picomatch` ReDoS, etc). The remaining 3 are all a single chain (`deepmerge-ts` → `@prisma/config` → `prisma`) that would require downgrading `prisma` itself — left alone rather than forcing a breaking dependency change.
+- [ ] Add error tracking (Sentry free tier is enough to start) on both client and server — needs a Sentry account/DSN, can't be wired up without one
+- [ ] Confirm CORS allowlist supports your real production domain(s), not just `FRONTEND_URL` + localhost — deployment-specific, revisit at Phase 7
+- [ ] Rotate the Cloudinary and DB credentials currently sitting in `server/.env` before this project is shared with anyone else or deployed anywhere — they're gitignored correctly, but treat any credential that's been sitting in a local `.env` for a while as due for rotation before go-live. **Manual action — nothing to run for this.**
+
+**Validation testing note:** every validated endpoint was exercised live against a real running server (not just typechecked) — registration/login with bad email/short password, address add with an invalid Emirate and a missing field, order placement with a negative quantity and an empty cart, order status with a bogus value, product stock/update with a zero price and a wrong type. This caught one real bug before it shipped: the cart-update schema initially required `productId` as a `number`, but the client actually sends it as a string (`String(product.id)`, since `User.cartItems` is a `String[]`) — would have broken every "add to cart" click. Fixed before commit.
 
 ---
 

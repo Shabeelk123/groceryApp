@@ -1,14 +1,15 @@
 import prisma from "../configs/db";
 import { Request, Response } from "express";
 import { VAT_RATE, getShippingFee } from "../utils/pricing";
+import logger from "../configs/logger";
 
 export const placeOrderCOD = async (req: Request, res: Response) => {
     try {
         const userId = req.userId;
-        const { items, addressId } = req.body;
-        if (!userId || !items || !addressId) {
-            return res.status(400).json({ error: "Missing required fields" });
+        if (!userId) {
+            return res.status(401).json({ error: "Unauthorized" });
         }
+        const { items, addressId } = req.body;
 
         const address = await prisma.address.findUnique({ where: { id: addressId } });
         if (!address || address.userId !== userId) {
@@ -47,7 +48,7 @@ export const placeOrderCOD = async (req: Request, res: Response) => {
         });
         return res.status(201).json({ success: true, order });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to place order" });
     }
 };
@@ -79,24 +80,19 @@ export const orderDetails = async (req: Request, res: Response) => {
           }); 
         return res.status(200).json({ orders });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to get orders" });
     }
 };
-
-export const ORDER_STATUSES = ["Order Placed", "Packed", "Shipped", "Delivered", "Cancelled"];
 
 export const updateOrderStatus = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
-        if (!status || !ORDER_STATUSES.includes(status)) {
-            return res.status(400).json({ error: `Status must be one of: ${ORDER_STATUSES.join(", ")}` });
-        }
         const order = await prisma.order.update({ where: { id: Number(id) }, data: { status } });
         return res.status(200).json({ order });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to update order status" });
     }
 };
@@ -126,7 +122,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
           }); 
         return res.status(200).json({ orders });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to get orders" });
     }
 };

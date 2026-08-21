@@ -3,13 +3,11 @@ import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../configs/env";
+import logger from "../configs/logger";
 
 export const registerUser = async (req: Request, res: Response) => {
     try {
         const { name, email, password } = req.body;
-        if (!name || !email || !password) {
-            return res.status(400).json({ error: "Missing required fields" });
-        }
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) {
@@ -38,7 +36,7 @@ export const registerUser = async (req: Request, res: Response) => {
         const { password: _password, ...safeUser } = user;
         return res.status(201).json({ user: safeUser });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to register user" });
     }
 };
@@ -47,9 +45,6 @@ export const registerUser = async (req: Request, res: Response) => {
 export const loginUser = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: "Missing required fields" });
-        }
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
@@ -73,7 +68,7 @@ export const loginUser = async (req: Request, res: Response) => {
         const { password: _password, ...safeUser } = user;
         return res.status(200).json({ user: safeUser });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to login user" });
     }
 };
@@ -93,7 +88,7 @@ export const checkAuth = async (req: Request, res: Response) => {
         }
         return res.status(200).json({ user });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to check authentication" });
     }
 };
@@ -104,7 +99,7 @@ export const logoutUser = async (req: Request, res: Response) => {
         res.clearCookie("token");
         return res.status(200).json({ message: "User logged out successfully" });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to logout user" });
     }
 };

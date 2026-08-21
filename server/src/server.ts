@@ -8,6 +8,9 @@ dotenv.config();
 import express, { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import cors from "cors";
+import helmet from "helmet";
+import pinoHttp from "pino-http";
+import logger from "./configs/logger";
 import userRouter from "./routes/userRoute";
 import cookieParser from "cookie-parser";
 import sellerRouter from "./routes/sellerRoute";
@@ -23,6 +26,8 @@ const PORT = process.env.PORT || 3000;
 
 connectCloudinary();
 
+app.use(helmet());
+app.use(pinoHttp({ logger }));
 app.use(express.json());
 
 const ALLOWED_ORIGINS = [
@@ -70,5 +75,5 @@ app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    logger.info(`Server is running on port ${PORT}`);
 });

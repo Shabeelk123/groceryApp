@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import logger from "../configs/logger";
 import { JWT_SECRET } from "../configs/env";
 
 interface JwtPayload {
@@ -25,7 +26,7 @@ const authSeller = (req: Request, res: Response, next: NextFunction) => {
             return res.status(401).json({ error: "Unauthorized - Invalid token payload" });
         }
     } catch (error) {
-        console.error("JWT verification error:", error);
+        logger.error({ error }, "JWT verification error");
         return res.status(401).json({ error: "Unauthorized - Invalid token" });
     }
 };

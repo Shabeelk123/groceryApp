@@ -47,12 +47,19 @@ model (not multi-vendor).
 **Customer account**
 - Multiple saved addresses: list, select at checkout, edit, delete — all ownership-checked server-side (a user can't read/edit/delete another user's address)
 
+**Security & hardening**
+- Every JSON-body endpoint validates input with `zod` (`server/src/validators/schemas.ts` + `validateBody` middleware) instead of scattered manual `if (!field)` checks; the two multipart product endpoints validate their JSON form field directly in the controller
+- Rate limiting on `/api/users/register`, `/api/users/login`, `/api/sellers/login` — 10 requests/15min per IP, each endpoint with its own independent counter
+- `helmet` applied globally in `server.ts`
+- Structured logging via `pino` + `pino-http` — every request is logged (method/path/status/duration), replacing all `console.error`/`console.log` calls
+- `registerUser`/`loginUser`/`updateCart` no longer echo the bcrypt password hash back in the response body (three separate leaks found and fixed across Phase 3/4 testing — `updateCart` was the same class of bug as the first two, just easy to miss since its response is a whole `User` row)
+- `npm audit fix` applied in `server/`: 12 of 15 pre-existing transitive-dependency vulnerabilities resolved (multer DoS bugs, `jws`, `qs`, `path-to-regexp`, `picomatch`). The remaining 3 all trace back to `prisma`'s own tooling deps and would require a `prisma` downgrade — left alone.
+
 **Infra**
 - `.env` files correctly gitignored in both `client/` and `server/` (verified — not tracked in git)
 - `.env.example` exists in both packages
 - CORS configured with an origin allowlist (not `*`)
 - Cookies set `httpOnly`, `secure` in production, `sameSite` adjusted per environment
-- `registerUser`/`loginUser` no longer echo the bcrypt password hash back in the response body (found and fixed while testing the address endpoints)
 
 ---
 
@@ -87,12 +94,10 @@ model (not multi-vendor).
 - No CSV/bulk product import
 
 **Security & production hardening**
-- No rate limiting anywhere (login, register, checkout all unthrottled — brute force / abuse risk)
-- No request validation library (zod/joi) — validation is manual `if (!field)` checks, easy to miss edge cases
-- No `helmet` or other HTTP security headers
 - No CSRF token (relies solely on `sameSite` cookies)
-- Order creation isn't wrapped in a DB transaction — a crash mid-loop could create a partial order
-- No structured logging or error tracking (Sentry etc.) — just `console.error`
+- Order creation isn't wrapped in a DB transaction — a crash mid-loop could create a partial order (Phase 2 item, paired with the stock-recheck-at-order-time work)
+- No error tracking (Sentry etc.) — needs an external account/DSN to wire up
+- CORS allowlist only covers `FRONTEND_URL` + localhost — revisit once a real production domain exists
 
 **Quality & ops**
 - No automated tests at all (no Jest/Vitest/Playwright config, zero test files in either package)
@@ -123,7 +128,7 @@ model (not multi-vendor).
 | Order status management | Done | — |
 | Admin dashboard stats | Done (basic) | — |
 | Inventory quantity tracking | Missing — deferred to pair with Phase 2 stock-recheck work | Should-have |
-| Security hardening (rate limit, request validation) | Partially done (JWT secret fixed, password-hash leak fixed; rate limiting/zod still missing) | **Yes** |
+| Security hardening (rate limit, request validation, helmet, logging) | Done (zod, rate limiting, helmet, pino, password-leak fixes); CSRF/Sentry/DB-transaction still open | **Yes** — remaining pieces (CSRF, Sentry) |
 | Tests | None | Should-have before scaling team |
 | Legal pages | None | **Yes** (UAE consumer protection) |
 | Deployment/CI | None | **Yes** |

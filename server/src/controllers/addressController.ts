@@ -1,17 +1,18 @@
 import prisma from "../configs/db";
 import { Request, Response } from "express";
+import logger from "../configs/logger";
 
 export const addAddress = async (req: Request, res: Response) => {
     try {
         const userId = req.userId;
-        const { address } = req.body;
-        if (!userId || !address) {
-            return res.status(400).json({ error: "Missing required fields" });
+        if (!userId) {
+            return res.status(401).json({ error: "Unauthorized" });
         }
+        const { address } = req.body;
         const created = await prisma.address.create({ data: { userId, ...address } });
         return res.status(200).json({ address: created });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to add address" });
     }
 };
@@ -29,7 +30,7 @@ export const listAddresses = async (req: Request, res: Response) => {
         });
         return res.status(200).json({ addresses });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to get addresses" });
     }
 };
@@ -39,9 +40,6 @@ export const updateAddress = async (req: Request, res: Response) => {
         const userId = req.userId;
         const { id } = req.params;
         const { address } = req.body;
-        if (!address) {
-            return res.status(400).json({ error: "Missing address data" });
-        }
 
         const existing = await prisma.address.findUnique({ where: { id: Number(id) } });
         if (!existing || existing.userId !== userId) {
@@ -51,7 +49,7 @@ export const updateAddress = async (req: Request, res: Response) => {
         const updated = await prisma.address.update({ where: { id: Number(id) }, data: address });
         return res.status(200).json({ address: updated });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to update address" });
     }
 };
@@ -72,7 +70,7 @@ export const deleteAddress = async (req: Request, res: Response) => {
         if (error?.code === "P2003") {
             return res.status(400).json({ error: "Cannot delete an address that's attached to an existing order." });
         }
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to delete address" });
     }
 };

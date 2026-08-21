@@ -1,5 +1,6 @@
 import prisma from "../configs/db";
 import { Request, Response } from "express";
+import logger from "../configs/logger";
 
 export const updateCart = async (req: Request, res: Response) => {
     try {
@@ -17,12 +18,14 @@ export const updateCart = async (req: Request, res: Response) => {
             cart = await prisma.user.update({
                 where: { id: userId },
                 data: { cartItems },
+                select: { cartItems: true },
             });
         } else if (productId !== undefined) {
             // Push a single product ID into the cart array
             cart = await prisma.user.update({
                 where: { id: userId },
                 data: { cartItems: { push: productId } },
+                select: { cartItems: true },
             });
         } else {
             return res.status(400).json({ error: "Either productId or cartItems must be provided" });
@@ -30,7 +33,7 @@ export const updateCart = async (req: Request, res: Response) => {
 
         return res.status(200).json({ cart });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to update cart" });
     }
 };

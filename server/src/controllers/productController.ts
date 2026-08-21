@@ -1,32 +1,24 @@
 import prisma from "../configs/db";
 import cloudinary from "cloudinary";
 import { Request, Response } from "express";
-
-interface Product {
-    name: string;
-    description: string;
-    price: number;
-    offerPrice: number;
-    image: string;
-    inStock: boolean;
-    category: string;
-}
+import { productDataSchema } from "../validators/schemas";
+import logger from "../configs/logger";
 
 export const addProduct = async (req: Request, res: Response) => {
     try {
-        let productData: Product;
+        let parsedJson: unknown;
         try {
-            productData = JSON.parse(req.body?.productData);
+            parsedJson = JSON.parse(req.body?.productData);
         } catch {
             return res.status(400).json({ error: "Invalid productData JSON" });
         }
 
-        const { name, description, price, offerPrice, category } = productData;
-
-        // inStock is NOT checked with ! because false is a valid value
-        if (!name || !description || !price || !offerPrice || !category || productData.inStock === undefined) {
-            return res.status(400).json({ error: "Missing required fields" });
+        const result = productDataSchema.safeParse(parsedJson);
+        if (!result.success) {
+            const first = result.error.issues[0];
+            return res.status(400).json({ error: first?.message || "Invalid product data" });
         }
+        const productData = result.data;
 
         const images = req.files as Express.Multer.File[];
         if (!images || images.length === 0) {
@@ -42,7 +34,7 @@ export const addProduct = async (req: Request, res: Response) => {
         const product = await prisma.product.create({ data: { ...productData, image: imageUrls } });
         return res.status(201).json({ product });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to add product" });
     }
 };
@@ -88,7 +80,7 @@ export const listProducts = async (req: Request, res: Response) => {
             pagination: { page: pageNum, limit: pageSize, total, totalPages: Math.ceil(total / pageSize) },
         });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to list products" });
     }
 };
@@ -100,7 +92,7 @@ export const singleProduct = async (req: Request, res: Response) => {
         const product = await prisma.product.findUnique({ where: { id: Number(id) } });
         return res.status(200).json({ product });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to get product" });
     }
 };
@@ -113,7 +105,7 @@ export const changeStock = async (req: Request, res: Response) => {
         const product = await prisma.product.update({ where: { id: Number(id) }, data: { inStock } });
         return res.status(200).json({ product });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to change stock" });
     }
 };
@@ -128,17 +120,19 @@ export const updateProduct = async (req: Request, res: Response) => {
             return res.status(404).json({ error: "Product not found" });
         }
 
-        let productData: Partial<Product> & { model?: string };
+        let parsedJson: unknown;
         try {
-            productData = JSON.parse(req.body?.productData);
+            parsedJson = JSON.parse(req.body?.productData);
         } catch {
             return res.status(400).json({ error: "Invalid productData JSON" });
         }
 
-        const { name, description, price, offerPrice, category, model } = productData;
-        if (!name || !description || !price || !offerPrice || !category || productData.inStock === undefined) {
-            return res.status(400).json({ error: "Missing required fields" });
+        const result = productDataSchema.safeParse(parsedJson);
+        if (!result.success) {
+            const first = result.error.issues[0];
+            return res.status(400).json({ error: first?.message || "Invalid product data" });
         }
+        const { name, description, price, offerPrice, category, model, inStock } = result.data;
 
         const images = req.files as Express.Multer.File[] | undefined;
         let imageUrls: string[] | undefined;
@@ -154,14 +148,13 @@ export const updateProduct = async (req: Request, res: Response) => {
         const product = await prisma.product.update({
             where: { id: Number(id) },
             data: {
-                name, description, price, offerPrice, category, model,
-                inStock: productData.inStock,
+                name, description, price, offerPrice, category, model, inStock,
                 ...(imageUrls ? { image: imageUrls } : {}),
             },
         });
         return res.status(200).json({ product });
     } catch (error) {
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to update product" });
     }
 };
@@ -176,7 +169,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
         if (error?.code === "P2003") {
             return res.status(400).json({ error: "Cannot delete a product that has existing orders. Mark it out of stock instead." });
         }
-        console.error(error);
+        logger.error(error);
         res.status(500).json({ error: "Failed to delete product" });
     }
 };
